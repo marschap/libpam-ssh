@@ -1,5 +1,4 @@
 start-ssh-agent.diff
-fix-getpwname.diff
 enable-debug-info.diff
 fix-try-first-password.diff
 describe-allow-blank-passphrase.diff
