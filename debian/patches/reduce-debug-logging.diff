@@ -1,0 +1,29 @@
+Description: reduce debug logging level
+Author: Jens Peter Secher <jps@debian.org> & Peter Marschall
+
+## This code was put into the public domain by Jens Peter Secher <jps@debian.org>.
+
+# Peter Marschall: refreshed against 1.97 & renamed to reduce-debug-logging.diff
+
+Index: libpam-ssh/authfile.c
+===================================================================
+--- libpam-ssh.orig/authfile.c	2009-03-29 18:13:26.000000000 +0200
++++ libpam-ssh/authfile.c	2009-03-29 18:13:36.000000000 +0200
+@@ -316,7 +316,7 @@
+ 	}
+ 	pk = PEM_read_PrivateKey(fp, NULL, NULL, (char *)passphrase);
+ 	if (pk == NULL) {
+-		debug("PEM_read_PrivateKey failed");
++		debug2("PEM_read_PrivateKey failed");
+ 		(void)ERR_get_error();
+ 	} else if (pk->type == EVP_PKEY_RSA &&
+ 	    (type == KEY_UNSPEC||type==KEY_RSA)) {
+@@ -350,7 +350,7 @@
+ 		EVP_PKEY_free(pk);
+ 	if (prv != NULL && commentp)
+ 		*commentp = xstrdup(name);
+-	debug("read PEM private key done: type %s",
++	debug2("read PEM private key done: type %s",
+ 	    prv ? key_type(prv) : "<unknown>");
+ 	return prv;
+ }
