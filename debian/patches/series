@@ -3,4 +3,3 @@ start-ssh-agent.diff
 reduce-debug-logging.diff
 #fix-try-first-password.diff
 describe-allow-blank-passphrase.diff
-handle-no-controlling-tty.diff
