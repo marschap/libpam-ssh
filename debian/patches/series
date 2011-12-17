@@ -1,4 +1,3 @@
-include-syslog.diff
 start-ssh-agent.diff
 fix-getpwname.diff
 enable-debug-info.diff
