@@ -1,6 +1,57 @@
-$Id: NEWS,v 1.10 2007/02/06 18:12:08 akorty Exp $
+$Id: NEWS,v 1.12 2009/04/11 19:43:44 rosenauer Exp $
 
-Version 1.92
+Version 1.97
+============
+
+SECURITY FIX: pam_ssh used a certain prompt if a user found to exist 
+to ask for the SSH passphrase explicitely depending on whether the
+username was valid or invalid, which made it easier for remote
+attackers to enumerate usernames. (CVE-2009-1273)
+
+
+**********************************************************************
+* The pam_ssh maintained on Novell's DeveloperNet got merged back    *
+* to SourceForge with Version 1.96 and syncs both up to the same     *
+* level. The DeveloperNet version isn't going to maintained further  *
+* http://developer.novell.com/wiki/index.php/Pam_ssh                 *
+**********************************************************************
+
+Version 1.96 (Novell DeveloperNet)
+============
+
+SECURITY FIX: The allow_blank_passphrase option was defeatable simply
+by entering a random but non-blank passphrase.  Thanks to Rob
+Henderson for the report.
+
+Version 1.95 (Novell DeveloperNet)
+============
+
+Bugfix release to avoid double-free and and a null-pointer dereference
+issues.
+
+Version 1.94 (Novell DeveloperNet)
+============
+
+Improved logging and bugfix release with improved recovery after
+system crashes.
+
+Version 1.93 (Novell DeveloperNet)
+============
+
+The option to allow blank passphrases is now 'nullok' while the old
+option is still available but deprecated.
+The debug option is now really supported as documented.
+We didn't start the ssh-agent if the close_session module wasn't  called
+correctly but the ssh-agent was killed (e.g. system crashes).
+That should be solved in almost all cases now.
+
+Version 1.92 (Novell DeveloperNet)
+============
+
+The module is usable now for session use only if wanted. It starts
+an ssh-agent without adding keys to it in that case.
+
+Version 1.92 (SourceForge)
 ============
 
 SECURITY FIX: The allow_blank_passphrase option was defeatable simply

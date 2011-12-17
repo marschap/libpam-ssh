@@ -43,6 +43,7 @@
 #include <unistd.h>
 
 #include <pam_appl.h>
+#include <security/pam_modules.h>
 
 #include <config.h>
 #include "openpam_cred.h"

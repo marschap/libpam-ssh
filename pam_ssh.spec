@@ -1,16 +1,15 @@
-Name: pam_ssh
-Version: 1.92
-Release: 0.fdr.1
-Epoch: 0
-Summary: A Pluggable Authentication Module (PAM) for use with SSH.
-Source: http://belnet.dl.sourceforge.net/sourceforge/%{name}/%{name}-%{version}.tar.bz2
-URL: http://sourceforge.net/projects/pam-ssh/
+# norootforbuild
 
-License: BSD
-BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
-Requires: pam, openssh, openssh-clients
-BuildRequires: pam-devel
-Group: System Environment/Base
+Name:           pam_ssh
+BuildRequires:  pam-devel
+License:        BSD
+Group:          Productivity/Networking/SSH
+Version:        1.97
+Release:        1
+Summary:        A Pluggable Authentication Module (PAM) for use with SSH.
+URL:            http://sourceforge.net/projects/pam-ssh/
+Source:         http://belnet.dl.sourceforge.net/sourceforge/%{name}/%{name}-%{version}.tar.bz2
+BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 
 %description
 This PAM module provides single sign-on behavior for UNIX using SSH. Users
