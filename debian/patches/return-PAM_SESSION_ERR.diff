@@ -1,0 +1,26 @@
+Description: return PAM_SESSION_ERR in pam_sm_{open,close}_session()
+Author: Peter Marschall
+
+Return PAM_SESSION_ERR instead of PAM_AUTH_ERR in pam_sm_{open,close}_session().
+According to my reading of the spec this fits the spec better.
+
+--- pam_ssh-1.97/pam_ssh.c
++++ pam_ssh-1.97/pam_ssh.c
+@@ -567,7 +567,7 @@ pam_sm_open_session(pam_handle_t *pamh, int flags,
+         if (!(user && (pwent = getpwnam(user)) && pwent->pw_dir &&
+             *pwent->pw_dir)) { 
+             pam_ssh_log(LOG_ERR, "can't get homedirectory");
+-            return PAM_AUTH_ERR;
++            return PAM_SESSION_ERR;
+         }
+ 
+         retval = openpam_borrow_cred(pamh, pwent);
+@@ -923,7 +923,7 @@ pam_sm_close_session(pam_handle_t *pamh, int flags __unused,
+ 		return retval;
+         if (!(user && (pwent = getpwnam(user)) && pwent->pw_dir &&
+             *pwent->pw_dir))
+-                return PAM_AUTH_ERR;
++                return PAM_SESSION_ERR;
+ 
+ 	retval = openpam_borrow_cred(pamh, pwent);
+ 	if (retval != PAM_SUCCESS && retval != PAM_PERM_DENIED) {
