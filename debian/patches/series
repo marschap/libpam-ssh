@@ -1,7 +1,7 @@
 return-PAM_SESSION_ERR.diff
 start-ssh-agent.diff
 reduce-debug-logging.diff
-fix-try-first-password.diff
+#fix-try-first-password.diff
 describe-allow-blank-passphrase.diff
 handle-no-controlling-tty.diff
 fix-manpage-warning.diff
