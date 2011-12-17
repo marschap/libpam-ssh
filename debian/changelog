@@ -1,3 +1,23 @@
+libpam-ssh (1.97-0pm1) unstable; urgency=low
+
+  * New upstream version 1.97
+  * update patches:
+  - debian/patches/include-syslog.diff: remove; obsoleted
+  - debian/patches/avoid-leaking-usernames.diff: remove; applied upstream
+  - debian/patches/fix-getpwname.diff: remove; applied upstream
+  - debian/patches/return-PAM_SESSION_ERR.diff: new
+  - debian/patches/reduce-debug-logging.diff: renamed
+  - debian/patches/fix-try-first-password.diff: slightly updated, ignored
+  - debian/patches/fix-manpage-warning.diff: remove; included upstream
+  - debian/patches/describe-allow_blank_passphrase.diff: updated
+  - debian/patches/handle-no-controlling-tty.diff: remove; obsoleted
+  - debian/patches/start-ssh-agent.diff: remove; obsoleted
+  * debian/compat: use v8
+  * debian/rules: switch to dh
+  * debian/NEWS.Debian: update
+
+ -- Peter Marschall <peter@adpm.de>  Sat, 17 Dec 2011 19:44:20 +0100
+
 libpam-ssh (1.92-14) unstable; urgency=low
 
   * Fix wrong use of pam-auth-update, thanks to Steve Langasek.
