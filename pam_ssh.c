@@ -1,5 +1,8 @@
 /*-
- * Copyright (c) 1999-2002, 2004, 2007 Andrew J. Korty
+ * Copyright (c) 2006 Wolfgang Rosenauer
+ * All rights reserved.
+ * 
+ * Copyright (c) 1999, 2000, 2001, 2002, 2004, 2007 Andrew J. Korty
  * All rights reserved.
  *
  * Copyright (c) 2001, 2002 Networks Associates Technology, Inc.
@@ -31,7 +34,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: pam_ssh.c,v 1.83 2007/02/06 18:10:46 akorty Exp $
+ * $Id: pam_ssh.c,v 1.84 2008/05/12 18:57:12 rosenauer Exp $
  */
 
 /* to get the asprintf() prototype from the glibc headers */
@@ -63,6 +66,7 @@
 #include <string.h>
 #include <sysexits.h>
 #include <unistd.h>
+#include <time.h>
 
 #define PAM_SM_AUTH
 #define PAM_SM_SESSION
@@ -82,7 +86,7 @@
 #include "key.h"
 #include "authfd.h"
 #include "authfile.h"
-#include "log.h"
+#include "pam_ssh_log.h"
 #if !HAVE_DECL_OPENPAM_BORROW_CRED || !HAVE_DECL_OPENPAM_RESTORE_CRED
 # include "openpam_cred.h"
 #endif
@@ -100,31 +104,38 @@
 # define __unused
 #endif
 
-#define	MODULE_NAME			"pam_ssh"
+#define	MODULE_NAME			PACKAGE_NAME
 #define	NEED_PASSPHRASE			"SSH passphrase: "
 #define DEF_KEYFILES			"id_dsa,id_rsa,identity"
 #define ENV_PID_SUFFIX			"_AGENT_PID"
 #define ENV_SOCKET_SUFFIX		"_AUTH_SOCK"
 #define PAM_OPT_KEYFILES_NAME		"keyfiles"
 #define PAM_OPT_BLANK_PASSPHRASE_NAME	"allow_blank_passphrase"
+#define PAM_OPT_NULLOK_NAME             "nullok"
 #define SEP_KEYFILES			","
 #define SSH_CLIENT_DIR			".ssh"
 
 enum {
 #if HAVE_OPENPAM || HAVE_PAM_STRUCT_OPTIONS || !HAVE_PAM_STD_OPTION
 	PAM_OPT_KEYFILES = PAM_OPT_STD_MAX,
-	PAM_OPT_BLANK_PASSPHRASE
+	PAM_OPT_BLANK_PASSPHRASE,
+	PAM_OPT_NULLOK
 #else
 	PAM_OPT_KEYFILES,
-	PAM_OPT_BLANK_PASSPHRASE
+	PAM_OPT_BLANK_PASSPHRASE,
+	PAM_OPT_NULLOK
 #endif
 };
 
 static struct opttab other_options[] = {
 	{ PAM_OPT_KEYFILES_NAME,		PAM_OPT_KEYFILES },
 	{ PAM_OPT_BLANK_PASSPHRASE_NAME,	PAM_OPT_BLANK_PASSPHRASE },
+	{ PAM_OPT_NULLOK_NAME,	                PAM_OPT_NULLOK },
 	{ NULL, 0 }
 };
+
+/* global variable to enable debug logging */
+int log_debug = 0;
 
 char *
 opt_arg(const char *arg)
@@ -137,28 +148,6 @@ opt_arg(const char *arg)
 	return retval;
 }
 
-/*
- * Generic logging function that tags a message with the module name,
- * saving errno so it doesn't get whacked by asprintf().
- */
-
-static void
-pam_ssh_log(int priority, const char *fmt, ...)
-{
-	va_list ap;		/* variable argument list */
-	int errno_saved;	/* for caching errno */
-	char *tagged;		/* format tagged with module name */
-
-	errno_saved = errno;
-	asprintf(&tagged, "%s: %s", MODULE_NAME, fmt);
-	va_start(ap, fmt);
-	errno = errno_saved;
-	vsyslog(priority, tagged ? tagged : fmt, ap);
-	free(tagged);
-	va_end(ap);
-}
-
-
 pid_t
 waitpid_intr(pid_t pid, int *status, int options)
 {
@@ -170,6 +159,29 @@ waitpid_intr(pid_t pid, int *status, int options)
 	return retval;
 }
 
+/* uptime function */
+static time_t
+uptime(void)
+{
+   FILE *fp;
+   double upsecs;
+
+   fp = fopen ("/proc/uptime", "r");
+   if (fp != NULL)
+   {
+       char buffer[BUFSIZ];
+       char *b = fgets(buffer, BUFSIZ, fp);
+       fclose (fp);
+       if (b == buffer)
+       {
+           char *end;
+           upsecs = strtod(buffer, &end);
+           if (end != buffer)
+               return upsecs;
+       }
+   }
+   return -1;
+}
 
 /*
  * Generic cleanup function for OpenSSH "Key" type.
@@ -194,7 +206,6 @@ ssh_cleanup(pam_handle_t *pamh __unused, void *data, int err __unused)
 		free(data);
 }
 
-
 /*
  * If the private key's passphrase is blank, only load it if the
  * *supplied* passphrase is blank and if allow_blank_passphrase is
@@ -203,14 +214,14 @@ ssh_cleanup(pam_handle_t *pamh __unused, void *data, int err __unused)
 
 static Key *
 key_load_private_maybe(const char *path, const char *passphrase,
-    char **commentp, int allow_blank)
+      char **commentp, int allow_blank)
 {
         Key *key;
 
         /* try loading the key with a blank passphrase */
         key = key_load_private(path, "", commentp);
         if (key)
-                return allow_blank && *passphrase == '\0' ? key : NULL;
+            return allow_blank && *passphrase == '\0' ? key : NULL;
 
         /* the private key's passphrase isn't blank */
         return key_load_private(path, passphrase, commentp);
@@ -355,7 +366,7 @@ PAM_EXTERN int
 pam_sm_authenticate(pam_handle_t *pamh, int flags __unused, int argc,
     const char **argv)
 {
-	int allow_blank_passphrase;	/* allow blank passphrases? */
+	int allow_blank_passphrase = 0;	/* allow blank passphrases? */
 	int authenticated;		/* user authenticated? */
 	char *dotdir;			/* .ssh dir name */
 	char *file;			/* current key file */
@@ -371,13 +382,9 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags __unused, int argc,
 #endif
 	const char *pass;		/* passphrase */
 	const struct passwd *pwent;	/* user's passwd entry */
-	struct passwd *pwent_keep;	/* our own copy */
 	int retval;			/* from calls */
 	const char *user;		/* username */
 
-	log_init(MODULE_NAME, SYSLOG_LEVEL_ERROR, SYSLOG_FACILITY_AUTHPRIV, 0);
-
-	allow_blank_passphrase = 0;
 	keyfiles = kfspec = NULL;
 #if HAVE_OPENPAM
 	if ((kfspec = openpam_get_option(pamh, PAM_OPT_KEYFILES_NAME))) {
@@ -387,15 +394,21 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags __unused, int argc,
 		}
 	} else
 		kfspec = DEF_KEYFILES;
-	if ((kfspec = openpam_get_option(pamh, PAM_OPT_BLANK_PASSPHRASE)))
+	if ((kfspec = openpam_get_option(pamh, PAM_OPT_BLANK_PASSPHRASE))
+          || kfspec = openpam_get_option(pamh, PAM_OPT_NULLOK))
 		allow_blank_passphrase = 1;
 #elif HAVE_PAM_STRUCT_OPTIONS || !HAVE_PAM_STD_OPTION
 	memset(&options, 0, sizeof options);
 	pam_std_option(&options, other_options, argc, argv);
+        log_debug = pam_test_option(&options, PAM_OPT_DEBUG, NULL);
+        pam_ssh_log(LOG_DEBUG, "init authentication module");
 	if (!pam_test_option(&options, PAM_OPT_KEYFILES, &kfspec))
 		kfspec = DEF_KEYFILES;
 	allow_blank_passphrase =
 		pam_test_option(&options, PAM_OPT_BLANK_PASSPHRASE, NULL);
+        if(!allow_blank_passphrase)
+                allow_blank_passphrase =
+                   pam_test_option(&options, PAM_OPT_NULLOK, NULL);
 #else
 	options = 0;
 	for (; argc; argc--, argv++) {
@@ -413,6 +426,7 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags __unused, int argc,
 				}
 				break;
 			PAM_OPT_BLANK_PASSPHRASE:
+                        PAM_OPT_NULLOK:
 				allow_blank_passphrase = 1;
 				break;
 			}
@@ -423,16 +437,25 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags __unused, int argc,
 		kfspec = DEF_KEYFILES;
 #endif
 
-	if ((retval = pam_get_user(pamh, &user, NULL)) != PAM_SUCCESS)
-		return retval;
-	if (!(user && (pwent = getpwnam(user)) && pwent->pw_dir &&
-	    *pwent->pw_dir))
-		return PAM_AUTH_ERR;
+	if ((retval = pam_get_user(pamh, &user, NULL)) != PAM_SUCCESS) {
+            pam_ssh_log(LOG_ERR, "can't get username (ret=%d)", retval);
+            return retval;
+        }
+        
+        if (!(user && (pwent = getpwnam(user)))) {
+            pam_ssh_log(LOG_ERR, "user not known");
+            return PAM_AUTH_ERR;
+        }
+        
+	if (!(pwent->pw_dir && *pwent->pw_dir)) {
+            pam_ssh_log(LOG_ERR, "cannot get homedirectory");
+            return PAM_AUTH_ERR;
+        }
 
 	retval = openpam_borrow_cred(pamh, pwent);
 	if (retval != PAM_SUCCESS && retval != PAM_PERM_DENIED) {
-		pam_ssh_log(LOG_ERR, "can't drop privileges: %m");
-		return retval;
+	    pam_ssh_log(LOG_ERR, "can't drop privileges: %m");
+	    return retval;
 	}
 
 	/* pass prompt message to application and receive passphrase */
@@ -445,12 +468,15 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags __unused, int argc,
 	retval = pam_get_pass(pamh, &pass, NEED_PASSPHRASE, options);
 #endif
 	if (retval != PAM_SUCCESS) {
-		openpam_restore_cred(pamh);
-		return retval;
+            pam_ssh_log(LOG_ERR, "can't get passphrase from PAM");
+            openpam_restore_cred(pamh);
+	    return retval;
 	}
+
 	if (!pass) {
-		openpam_restore_cred(pamh);
-		return PAM_AUTH_ERR;
+            pam_ssh_log(LOG_ERR, "blank passphrases disabled");
+	    openpam_restore_cred(pamh);
+	    return PAM_AUTH_ERR;
 	}
 
 	OpenSSL_add_all_algorithms(); /* required for DSA */
@@ -473,29 +499,16 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags __unused, int argc,
 	for (file = strtok(keyfiles, SEP_KEYFILES); file;
 	     file = strtok(NULL, SEP_KEYFILES))
 		if (auth_via_key(pamh, file, dotdir, pwent, pass,
-                    allow_blank_passphrase) == PAM_SUCCESS)
-			authenticated = 1;
+                    allow_blank_passphrase) == PAM_SUCCESS) {
+                    pam_ssh_log(LOG_DEBUG, "auth successful for key %s", file);
+		    authenticated = 1;
+                }
 	free(dotdir);
 	free(keyfiles);
 	if (!authenticated) {
-		openpam_restore_cred(pamh);
-		return PAM_AUTH_ERR;
-	}
-
-	/* copy the passwd entry (in case successive calls are made) and
-           save it for the session phase */
-
-	if (!(pwent_keep = malloc(sizeof *pwent))) {
-		pam_ssh_log(LOG_CRIT, "out of memory");
-		openpam_restore_cred(pamh);
-		return PAM_SERVICE_ERR;
-	}
-	memcpy(pwent_keep, pwent, sizeof *pwent_keep);
-	if ((retval = pam_set_data(pamh, "ssh_passwd_entry", pwent_keep,
-	    ssh_cleanup)) != PAM_SUCCESS) {
-		free(pwent_keep);
-		openpam_restore_cred(pamh);
-		return retval;
+            pam_ssh_log(LOG_DEBUG, "not able to open any key");
+	    openpam_restore_cred(pamh);
+	    return PAM_AUTH_ERR;
 	}
 
 	openpam_restore_cred(pamh);
@@ -512,8 +525,8 @@ pam_sm_setcred(pam_handle_t *pamh __unused, int flags __unused,
 
 
 PAM_EXTERN int
-pam_sm_open_session(pam_handle_t *pamh, int flags __unused,
-    int argc __unused, const char **argv __unused)
+pam_sm_open_session(pam_handle_t *pamh, int flags,
+    int argc, const char **argv)
 {
 	char *agent_pid;		/* copy of agent PID */
 	char *agent_socket;		/* agent socket */
@@ -528,7 +541,6 @@ pam_sm_open_session(pam_handle_t *pamh, int flags __unused,
 	char *env_value;		/* envariable value */
 	int env_write;			/* env file descriptor */
 	char hname[MAXHOSTNAMELEN];	/* local hostname */
-	int no_link;			/* link per-agent file? */
 	char *per_agent;		/* to store env */
 	char *per_session;		/* per-session filename */
 	const struct passwd *pwent;	/* user's passwd entry */
@@ -536,21 +548,35 @@ pam_sm_open_session(pam_handle_t *pamh, int flags __unused,
 	int start_agent;		/* start agent? */
 	const char *tty_raw;		/* raw tty or display name */
 	char *tty_nodir;		/* tty without / chars */
+        const char *user;               /* username */
+        struct options options;         /* PAM options */
+        struct stat stat_buf;           /* stat structure */
+        time_t file_ctime;              /* creation time of per-agent file */
+        time_t time_now;                /* current time */
+        time_t time_up;                 /* uptime */
 
-	log_init(MODULE_NAME, SYSLOG_LEVEL_ERROR, SYSLOG_FACILITY_AUTHPRIV, 0);
+        memset(&options, 0, sizeof options);
+        pam_std_option(&options, other_options, argc, argv);
+        log_debug = pam_test_option(&options, PAM_OPT_DEBUG, NULL);
+        pam_ssh_log(LOG_DEBUG, "open session");
+                                        
+        if ((retval = pam_get_user(pamh, &user, NULL)) != PAM_SUCCESS) {
+            pam_ssh_log(LOG_ERR, "can't get username (ret=%d)", retval);
+            return retval;
+        }
+        if (!(user && (pwent = getpwnam(user)) && pwent->pw_dir &&
+            *pwent->pw_dir)) { 
+            pam_ssh_log(LOG_ERR, "can't get homedirectory");
+            return PAM_AUTH_ERR;
+        }
 
-	/* dump output of ssh-agent in ~/.ssh */
-	if ((retval = pam_get_data(pamh, "ssh_passwd_entry",
-	    (const void **)(void *)&pwent))
-	    != PAM_SUCCESS)
-		return retval;
+        retval = openpam_borrow_cred(pamh, pwent);
+        if (retval != PAM_SUCCESS && retval != PAM_PERM_DENIED) {
+            pam_ssh_log(LOG_ERR, "can't drop privileges: %m");
+            return retval;
+        }
 
-	retval = openpam_borrow_cred(pamh, pwent);
-	if (retval != PAM_SUCCESS && retval != PAM_PERM_DENIED) {
-		pam_ssh_log(LOG_ERR, "can't drop privileges: %m");
-		return retval;
-	}
-
+        
 	/*
 	 * Use reference counts to limit agents to one per user per host.
 	 *
@@ -579,9 +605,10 @@ pam_sm_open_session(pam_handle_t *pamh, int flags __unused,
 
 	if ((retval = pam_set_data(pamh, "ssh_agent_env_agent", per_agent,
 	    ssh_cleanup)) != PAM_SUCCESS) {
-		free(per_agent);
-		openpam_restore_cred(pamh);
-		return retval;
+            pam_ssh_log(LOG_ERR, "can't save per-agent filename to PAM env");
+            free(per_agent);
+	    openpam_restore_cred(pamh);
+	    return retval;
 	}
 
 	/* Try to create the per-agent file or open it for reading if it
@@ -589,13 +616,40 @@ pam_sm_open_session(pam_handle_t *pamh, int flags __unused,
            per-session filename later.  Start the agent if we can't open
 	   the file for reading. */
 
-	env_write = child_pid = no_link = start_agent = 0;
+	env_write = -1;
+        child_pid = 0;
 	env_read = NULL;
-	if ((env_write = open(per_agent, O_CREAT | O_EXCL | O_WRONLY, S_IRUSR))
-	    < 0 && !(env_read = fopen(per_agent, "r")))
-		no_link = 1;
-	if (!env_read) {
-		start_agent = 1;
+        start_agent = 1;
+
+        if ((env_read = fopen(per_agent, "r"))) {
+            pam_ssh_log(LOG_DEBUG, "per_agent file already exists");
+            /* invalidate the status files if the reboot time was later
+             * than the file creation time */
+            if (retval = stat(per_agent, &stat_buf)) {
+                pam_ssh_log(LOG_ERR, "stat() failed on %s", per_agent);
+                free(per_agent);
+                fclose(env_read);
+                return retval;
+            }
+            file_ctime = stat_buf.st_mtime;
+
+            time_now = time(NULL);
+            if((time_up = uptime()) > 0) {
+                if (file_ctime > (time_now - time_up)) {
+                    // session is still running - do nothing
+                    start_agent = 0;
+                } else
+                    fclose(env_read);
+            }
+        }
+        
+	if (start_agent) {
+                if ((env_write = open(per_agent, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR)) < 0) {
+                        pam_ssh_log(LOG_ERR, "can't write to %s", per_agent);
+                        free(per_agent);
+                        openpam_restore_cred(pamh);
+                        return PAM_SERVICE_ERR;
+                }
 		if (pipe(child_pipe) < 0) {
 			pam_ssh_log(LOG_ERR, "pipe: %m");
 			close(env_write);
@@ -657,6 +711,7 @@ pam_sm_open_session(pam_handle_t *pamh, int flags __unused,
 			arg[1] = "-s";
 			arg[2] = NULL;
 			env[0] = NULL;
+                        pam_ssh_log(LOG_DEBUG, "exec %s", PATH_SSH_AGENT);
 			execve(PATH_SSH_AGENT, arg, env);
 			pam_ssh_log(LOG_ERR, "%s: %m", PATH_SSH_AGENT);
 			_exit(127);
@@ -799,14 +854,6 @@ pam_sm_open_session(pam_handle_t *pamh, int flags __unused,
 	}
 	free(agent_socket);
 
-	/* if we couldn't access the per-agent file, don't link a
-           per-session filename to it */
-
-	if (no_link) {
-		openpam_restore_cred(pamh);
-		return PAM_SUCCESS;
-	}
-
 	/* the per-session file contains the display name or tty name as
            well as the hostname */
 
@@ -815,6 +862,13 @@ pam_sm_open_session(pam_handle_t *pamh, int flags __unused,
 		openpam_restore_cred(pamh);
 		return retval;
 	}
+
+        /* tty_raw could be NULL in which case we shouldn't bother
+         * with the per-session file */
+        if (!tty_raw) {
+                pam_ssh_log(LOG_DEBUG, "session has no tty");
+                return PAM_SUCCESS;
+        }
 
 	/* set tty_nodir to the tty with / replaced by _ */
 
@@ -863,10 +917,13 @@ pam_sm_close_session(pam_handle_t *pamh, int flags __unused,
 	const char *ssh_agent_pid;	/* ssh-agent pid string */
 	const struct passwd *pwent;	/* user's passwd entry */
 	struct stat sb;			/* to check st_nlink */
+        const char *user;               /* username */
 
-	if ((retval = pam_get_data(pamh, "ssh_passwd_entry",
-	    (const void **)(void *)&pwent)) != PAM_SUCCESS)
+        if ((retval = pam_get_user(pamh, &user, NULL)) != PAM_SUCCESS)
 		return retval;
+        if (!(user && (pwent = getpwnam(user)) && pwent->pw_dir &&
+            *pwent->pw_dir))
+                return PAM_AUTH_ERR;
 
 	retval = openpam_borrow_cred(pamh, pwent);
 	if (retval != PAM_SUCCESS && retval != PAM_PERM_DENIED) {

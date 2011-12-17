@@ -1,4 +1,5 @@
 dnl Copyright (c) 2002, 2004, 2007 Andrew J. Korty
+dnl           (c) 2006-2009 Wolfgang Rosenauer
 dnl All rights reserved.
 dnl 
 dnl Redistribution and use in source and binary forms, with or without
@@ -22,16 +23,16 @@ dnl LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 dnl OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 dnl SUCH DAMAGE.
 dnl
-dnl $Id: configure.ac,v 1.10 2007/02/06 18:11:08 akorty Exp $
+dnl $Id: configure.ac,v 1.12 2009/04/11 19:43:44 rosenauer Exp $
 
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT([pam_ssh],[1.92],[ajk@ajk.name])
+AC_INIT([pam_ssh],[1.97],[ajk@ajk.name])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_SRCDIR([pam_ssh.c])
 AC_CANONICAL_TARGET([])
 AM_DISABLE_STATIC
-AM_INIT_AUTOMAKE(pam_ssh, 1.92)
+AM_INIT_AUTOMAKE(pam_ssh, 1.97)
 AM_PROG_LIBTOOL
 AC_SUBST(LIBTOOL_DEPS)
 

@@ -1,4 +1,87 @@
-Version 1.92 released
+Version 1.97 released
+=====================
+2009-04-11  Wolfgang Rosenauer
+
+	* pam_get_pass.c: CVE-2009-1273
+	  pam_ssh used a certain prompt if a user found to exist to ask
+	  for the SSH passphrase explicitely depending on whether the
+	  username was valid or invalid, which made it easier for remote 
+	  attackers to enumerate usernames.
+
+**********************************************************************
+* The pam_ssh maintained on Novell's DeveloperNet got merged back    *
+* to SourceForge with Version 1.96 and syncs both up to the same     *
+* level. The DeveloperNet version isn't going to maintained further  *
+* http://developer.novell.com/wiki/index.php/Pam_ssh                 *
+**********************************************************************
+
+Version 1.96 released (Novell DeveloperNet)
+=====================
+2007-08-03  Wolfgang Rosenauer (merged from SF.net Andrew J. Korty <ajk@iu.edu>)
+
+	* pam_ssh.c (key_load_private_maybe): New wrapper for
+ 	  key_load_private() that checks whether the private key's
+	  passphrase is blank.  If so and if allow_blank_passphrase isn't set
+	  or the user supplied passphrase isn't empty, this function returns 
+	  NULL.  This approach is necessary because key_load_private() will 
+	  load a key with a blank passphrase regardless of the passphrase 
+	  entered.  Thanks to Rob Henderson for the report.
+
+Version 1.95 released (Novell DeveloperNet)
+=====================
+
+2007-04-02  Wolfgang Rosenauer
+
+	* pam_ssh.c: if PAM returns tty_raw = NULL we shouldn't fiddle
+	  with a per-session file. That seems to happen if the session
+	  module is used for background system services (like cron).
+	  https://bugzilla.novell.com/show_bug.cgi?id=251053
+
+2006-11-24  Wolfgang Rosenauer
+
+	* pam_ssh.c: fixed double-free issue with file closing
+	  https://bugzilla.novell.com/show_bug.cgi?id=223488
+	  (patch by Reinhard Max)
+
+Version 1.94 released (Novell DeveloperNet)
+=====================
+
+2006-08-03  Wolfgang Rosenauer
+
+	* pam_ssh.c: fixed some debug output, create the agent file
+	  writable for the user to be able to recover from a system crash
+	  and fixed a missing credential restore which caused pam to fail 
+	  for following modules in error case
+
+Version 1.93 released (Novell DeveloperNet)
+=====================
+
+2006-06-24  Wolfgang Rosenauer
+
+	* pam_ssh.c, pam_ssh.8: nullok option to allow blank passphrases
+	  replaces allow_blank_passphrases (which is still available for
+	  compat reasons)
+
+	* pam_ssh.c, pam_std_option.c, pam_ssh_log.c, pam_ssh_log.h:
+	  fixed logging and separated into a logging module
+	  PAM option 'debug' is supported now
+	  added more syslog output in debug mode
+
+	* pam_ssh.c: we should be able to recover now correctly after system 
+	  crashes where we are not able to run the close_session using 
+	  the machine's uptime
+
+Version 1.92 released (Novell DeveloperNet)
+=====================
+
+2006-05-31  Wolfgang Rosenauer
+
+	* cipher.c, openpam_borrow_cred.c, openpam_restore_cred.c, pam_ssh.c:
+	  added some needed includes
+	* pam_ssh.c: don't rely on authentication for the session functions
+	  and don't save the passwd entry for them
+
+Version 1.92 released (SourceForge)
 =====================
 
 2007-02-06  Andrew J. Korty  <ajk@iu.edu>

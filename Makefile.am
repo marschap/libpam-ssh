@@ -22,7 +22,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 # 
-# $Id: Makefile.am,v 1.18 2004/02/20 14:57:23 akorty Exp $
+# $Id: Makefile.am,v 1.19 2008/05/12 18:57:12 rosenauer Exp $
 
 lib_LTLIBRARIES			= pam_ssh.la
 pam_ssh_la_LDFLAGS		= -avoid-version -module
@@ -33,7 +33,7 @@ pam_ssh_la_SOURCES		= atomicio.c atomicio.h authfd.c authfd.h   \
 				  cipher-3des1.c cipher-bf1.c cipher-ctr.c  \
 				  getput.h kex.h key.c key.h log.c log.h    \
 				  pam_ssh.c rijndael.c rijndael.h xmalloc.c \
-				  xmalloc.h
+				  pam_ssh_log.c xmalloc.h
 libdir				= @PAMDIR@
 man_MANS			= pam_ssh.8
 AM_CFLAGS			= -Wall

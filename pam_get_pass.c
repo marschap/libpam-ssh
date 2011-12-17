@@ -80,13 +80,20 @@ pam_get_pass(pam_handle_t *pamh, const char **passp, const char *prompt,
 	const void *item = NULL;
 
 	/*
-	 * Grab the already-entered password if we might want to use it.
+	 * Grab the already-entered password.
 	 */
+        retval = pam_get_item(pamh, PAM_AUTHTOK, &item);
+        /*
+         * Always use standard prompt for the first time.
+         */
+        if (item == NULL)
+                prompt = "Password: ";
 	if (pam_test_option(options, PAM_OPT_TRY_FIRST_PASS, NULL) ||
 	    pam_test_option(options, PAM_OPT_USE_FIRST_PASS, NULL)) {
-		retval = pam_get_item(pamh, PAM_AUTHTOK, &item);
 		if (retval != PAM_SUCCESS)
 			return retval;
+        } else {
+                item = NULL;    /* Need own password. */
 	}
 
 	if (item == NULL) {

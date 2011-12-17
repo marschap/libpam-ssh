@@ -28,7 +28,6 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <syslog.h>
 #include <pam_appl.h>
 
 #include <config.h>
@@ -36,6 +35,7 @@
 # include "pam_opttab.h"
 #endif
 #include "pam_option.h"
+#include "pam_ssh_log.h"
 
 /* Everyone has to have these options. It is not an error to
  * specify them and then not use them.
@@ -73,7 +73,7 @@ pam_std_option(struct options *options, struct opttab other_options[],
 			options->opt[i].name = std_options[i].name;
 		else if (extra) {
 			if (oo->value != i)
-				syslog(LOG_DEBUG, "Extra option fault: %d %d",
+				pam_ssh_log(LOG_NOTICE, "Extra option fault: %d %d",
 				    oo->value, i);
 			options->opt[i].name = oo->name;
 			oo++;
@@ -87,7 +87,7 @@ pam_std_option(struct options *options, struct opttab other_options[],
 
 	for (j = 0; j < argc; j++) {
 #ifdef DEBUG
-		syslog(LOG_DEBUG, "Doing arg %s", argv[j]);
+		pam_ssh_log(LOG_INFO, "Doing arg %s", argv[j]);
 #endif
 		found = 0;
 		for (i = 0; i < PAM_MAX_OPTIONS; i++) {
@@ -109,7 +109,7 @@ pam_std_option(struct options *options, struct opttab other_options[],
 			}
 		}
 		if (!found)
-			syslog(LOG_WARNING, "PAM option: %s invalid", argv[j]);
+			pam_ssh_log(LOG_WARNING, "PAM option: %s invalid", argv[j]);
 	}
 }
 
