@@ -1,0 +1,66 @@
+$Id: NEWS,v 1.10 2007/02/06 18:12:08 akorty Exp $
+
+Version 1.92
+============
+
+SECURITY FIX: The allow_blank_passphrase option was defeatable simply
+by entering a random but non-blank passphrase.  Thanks to Rob
+Henderson for the report.
+
+Version 1.91
+============
+
+Don't allow blank passphrases by default.  Add option
+allow_blank_passphrase to re-enable them.  Thanks to red0x for the
+suggestion.
+
+Version 1.9
+===========
+
+Code cleanup release.  Updated OpenSSH compatibility code to 3.7.1p2.
+Updated for newer Autoconf and Automake.  Plus we use Autoheader now.
+
+Version 1.8
+===========
+
+This version is more portable about the way it juggles user IDs when
+starting the agent.  As a result, it works on Linux systems.  Also,
+it tries to run as the user rather than root as much as possible.
+
+Other portability changes were made--pam_ssh should now work on
+Mac OS X systems.
+
+Version 1.7
+===========
+
+Mark R V Murray of the FreeBSD project wrote a manual page, which we
+now include in the distribution.
+
+We now use Automake, Autoconf, and Libtool.  I think a guy named Trey
+donated most of the Autoconf logic, which I probably ended up marring
+beyond recognition.  Trey, if you're out there, drop me another note
+so I can give you proper credit.
+
+In this version we fixed a bunch of bugs and added support for OpenPAM
+and pam_std_option(), all thanks to FreeBSD.  The OpenSSH code has
+been updated to 3.4p1.
+
+Version 1.6
+===========
+
+Only one agent is started per user per host.  Thanks to
+<hmh@debian.org> for this idea.  Each agent has an associated file
+with environment data (.ssh/agent-<hostname>).  When a concurrent
+session is started, the session phase need only pass this environment
+data to the application rather than starting a new agent and adding
+the keys.  A filename (.ssh/agent-<host>-<tty> or
+.ssh/agent-<host>-<display>) is hard linked to this environment file
+for each session to keep a reference count of the number of sessions
+using the agent.  Only when the count drops to zero is the agent
+killed.
+
+Added keyfiles option to specify which key files to use for
+authentication.  Only these keys will be given to the agent in the
+session phase.
+
+Updated OpenSSH code to version 2.9p2.
