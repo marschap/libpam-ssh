@@ -1,87 +1,13 @@
 #!/usr/bin/make -f
 ## debian/rules for libpam-ssh.
-## Placed into the public domain by Jens Peter Secher <jps@debian.org>.
 
-## Skip optimisation if noopt is specified.
-cflags := -Wall -g
-ifeq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
-	cflags += -O2
-else
-	cflags += -O0
-endif
+%:
+	dh $@ --with autoreconf
 
-## Setup ./configure arguments to fit Debian environment.
-export DEB_HOST_GNU_TYPE ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
-export DEB_BUILD_GNU_TYPE ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
-config_flags := \
-	--config-cache \
-	--enable-debug \
-	--prefix=/usr \
-	--sysconfdir=/etc \
-	--mandir=/usr/share/man \
-	--infodir=/usr/share/info \
-	--libexecdir=/usr/lib \
-	--build $(DEB_BUILD_GNU_TYPE)
-ifneq ($(DEB_BUILD_GNU_TYPE), $(DEB_HOST_GNU_TYPE))
-	config_flags += --host $(DEB_HOST_GNU_TYPE)
-endif
-
-## Where the package files will end up.
-debian := $(CURDIR)/debian
-destdir := $(debian)/libpam-ssh
-
-configure: configure-stamp
-
-## Configure using uptodate config.{sub,guess}.
-configure-stamp:
-	dh_testdir
-	ln -sf /usr/share/misc/config.sub /usr/share/misc/config.guess $(CURDIR)
-	$(SHELL) $(CURDIR)/configure $(config_flags) CFLAGS="$(cflags)"
-	touch $@
-
-build: configure build-stamp
-
-build-stamp:
-	dh_testdir
-	$(MAKE) CFLAGS="$(cflags) -Wl,--version-script,debian/pam_ssh.version"
-	touch $@
-
-install-stamp: build-stamp
-	dh_testdir
-	dh_testroot
-	dh_prep
-	$(MAKE) install DESTDIR=$(destdir)
-	libtool --quiet --finish $(destdir)/lib/security/
-	rm -f $(destdir)/lib/security/pam_ssh.la
+override_dh_auto_install:
+	dh_auto_install
+	rm -f debian/libpam-ssh/lib/security/pam_ssh.la
 	install -D -m 644 debian/pam-auth-update.silent-ssh-single-sign-on \
-		 $(destdir)/usr/share/pam-configs/silent-ssh-single-sign-on
-	touch $@
+		debian/libpam-ssh/usr/share/pam-configs/silent-ssh-single-sign-on
 
-## Nothing arch-independent.
-binary-indep: build install-stamp
-
-binary-arch: build install-stamp
-	dh_testdir
-	dh_testroot
-	dh_installchangelogs ChangeLog
-	dh_installdocs
-	dh_strip
-	dh_compress
-	dh_fixperms
-	dh_makeshlibs
-	dh_installdeb
-	dh_shlibdeps
-	dh_gencontrol
-	dh_md5sums
-	dh_builddeb
-
-binary: binary-indep binary-arch
-
-clean:
-	dh_testdir
-	dh_testroot
-	[ ! -f Makefile ] || make distclean
-	rm -f configure-stamp build-stamp install-stamp config.guess config.sub
-	dh_clean
-
-.PHONY: configure build binary binary-indep binary-arch clean
+# EOF
