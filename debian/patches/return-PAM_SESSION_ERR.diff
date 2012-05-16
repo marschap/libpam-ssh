@@ -1,8 +1,8 @@
 Description: return PAM_SESSION_ERR in pam_sm_{open,close}_session()
+ .
+ Return PAM_SESSION_ERR instead of PAM_AUTH_ERR in pam_sm_{open,close}_session().
+ According to my reading of the spec this fits the spec better.
 Author: Peter Marschall
-
-Return PAM_SESSION_ERR instead of PAM_AUTH_ERR in pam_sm_{open,close}_session().
-According to my reading of the spec this fits the spec better.
 
 --- pam_ssh-1.97/pam_ssh.c
 +++ pam_ssh-1.97/pam_ssh.c
