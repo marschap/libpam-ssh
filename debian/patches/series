@@ -2,3 +2,4 @@ return-PAM_SESSION_ERR.diff
 reduce-debug-logging.diff
 #fix-try-first-password.diff
 describe-allow-blank-passphrase.diff
+setgid.patch

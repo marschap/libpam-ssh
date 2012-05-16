@@ -1,0 +1,19 @@
+Description: Correctly drop priviledges when spawning ssh-agent.
+ .
+ Besides the uid, also reset the gid as well as all 
+ additional groups to those of the authenticated user.
+Origin: vendor, http://bugzillafiles.novell.org/attachment.cgi?id=432434
+Bug-OpenSuSE: https://bugzilla.novell.com/show_bug.cgi?id=665061
+
+--- pam_ssh-1.97/pam_ssh.c
++++ pam_ssh-1.97/pam_ssh.c
+@@ -684,7 +684,8 @@ pam_sm_open_session(pam_handle_t *pamh,
+ 				_exit(EX_OSERR);
+ 				/* NOTREACHED */
+ 			case PAM_SUCCESS:
+-				if (setuid(pwent->pw_uid) == -1) {
++				if (initgroups(pwent->pw_name, pwent->pw_gid) == -1 ||
++				setgid(pwent->pw_gid) == -1 || setuid(pwent->pw_uid) == -1) {
+ 					pam_ssh_log(LOG_ERR,
+ 					    "can't drop privileges: %m",
+ 					    pwent->pw_uid);
