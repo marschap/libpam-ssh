@@ -1,0 +1,27 @@
+Description: avoid double-free in pam_sm_open_session()
+ .
+ Use another call to pam_set_data() to release the data instead of free().
+Origin: vendor, https://bugs.gentoo.org/attachment.cgi?id=199834
+Bug-Gentoo: https://bugs.gentoo.org/show_bug.cgi?id=279538
+Bug-OpenSuSE: https://bugzilla.novell.com/show_bug.cgi?id=688120
+
+--- pam_ssh-1.97/pam_ssh.c
++++ pam_ssh-1.97/pam_ssh.c
+@@ -627,7 +627,7 @@ pam_sm_open_session(pam_handle_t *pamh,
+              * than the file creation time */
+             if (retval = stat(per_agent, &stat_buf)) {
+                 pam_ssh_log(LOG_ERR, "stat() failed on %s", per_agent);
+-                free(per_agent);
++                pam_set_data(pamh, "ssh_agent_env_agent", NULL, NULL);
+                 fclose(env_read);
+                 return retval;
+             }
+@@ -646,7 +646,7 @@ pam_sm_open_session(pam_handle_t *pamh,
+ 	if (start_agent) {
+                 if ((env_write = open(per_agent, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR)) < 0) {
+                         pam_ssh_log(LOG_ERR, "can't write to %s", per_agent);
+-                        free(per_agent);
++                        pam_set_data(pamh, "ssh_agent_env_agent", NULL, NULL);
+                         openpam_restore_cred(pamh);
+                         return PAM_SERVICE_ERR;
+                 }
