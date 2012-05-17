@@ -5,3 +5,4 @@ describe-allow-blank-passphrase.diff
 setgid.patch
 sigmask.patch
 double-free.patch
+EOF-password.patch
