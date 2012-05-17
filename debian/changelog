@@ -1,3 +1,13 @@
+libpam-ssh (1.97-0pm2) unstable; urgency=low
+
+  * debian/patches/return-PAM_SESSION_ERR.diff: DEP-3 update
+  * debian/patches/setgid.patch: new
+  * debian/patches/sigmask.patch: new
+  * debian/patches/double-free.patch: new
+  * debian/patches/EOF-password.patch: new
+
+ -- Peter Marschall <peter@adpm.de>  Thu, 17 May 2012 09:29:51 +0200
+
 libpam-ssh (1.97-0pm1) unstable; urgency=low
 
   * New upstream version 1.97
