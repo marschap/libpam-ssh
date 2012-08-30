@@ -5,40 +5,35 @@ Author: Jens Peter Secher & Ansgar Burchardt
 Let the PAM session handle situations where there is no controlling tty
 by using the PID to construct the sessoin file name.
 
-Index: libpam-ssh/pam_ssh.c
-===================================================================
---- libpam-ssh.orig/pam_ssh.c	2009-08-16 20:08:36.000000000 +0200
-+++ libpam-ssh/pam_ssh.c	2009-08-16 20:20:58.000000000 +0200
-@@ -907,6 +907,7 @@
- 	ssh_close_authentication_connection(ac);
- 
- 	if (start_agent && retval != PAM_SUCCESS) {
-+		debug("could not start SSH agent");
- 		openpam_restore_cred(pamh);
- 		return retval;
- 	}
-@@ -928,15 +929,28 @@
+--- a/pam_ssh.c
++++ b/pam_ssh.c
+@@ -923,22 +923,28 @@
  		return retval;
  	}
  
--	/* set tty_nodir to the tty with / replaced by _ */
+-	/* tty_raw could be NULL in which case we shouldn't bother
+-     with the per-session file */
+-	if (!tty_raw) {
+-		pam_ssh_log(LOG_DEBUG, "session has no tty");
+-		return PAM_SUCCESS;
 + 	/* if there is no controlling tty, then use the process id */
- 
--	if (!(tty_nodir = strdup(tty_raw))) {
--		pam_ssh_log(LOG_CRIT, "out of memory");
--		openpam_restore_cred(pamh);
--		return PAM_SERVICE_ERR;
++
 +	if (tty_raw == NULL) {
-+		debug("no controlling tty");
++		pam_ssh_log(LOG_DEBUG, "no controlling tty");
 +		if (asprintf(&tty_nodir, "pid%ld", (long) getpid()) == -1) {
 +			pam_ssh_log(LOG_CRIT, "out of memory");
 +			openpam_restore_cred(pamh);
 +			return PAM_SERVICE_ERR;
 +		}
-+	}
-+
+ 	}
+ 
+-	/* set tty_nodir to the tty with / replaced by _ */
 +	/* else set tty_nodir to the tty with / replaced by _ */
-+
+ 
+-	if (!(tty_nodir = strdup(tty_raw))) {
+-		pam_ssh_log(LOG_CRIT, "out of memory");
+-		openpam_restore_cred(pamh);
+-		return PAM_SERVICE_ERR;
 +	else {
 +		if (!(tty_nodir = strdup(tty_raw))) {
 +			pam_ssh_log(LOG_CRIT, "out of memory");
@@ -51,5 +46,5 @@ Index: libpam-ssh/pam_ssh.c
 -	for (cp = tty_nodir; (cp = strchr(cp, '/')); )
 -		*cp = '_';
  
- 	if (asprintf(&per_session, "%s/.ssh/agent-%s-%s", pwent->pw_dir, hname,
- 	    tty_nodir) == -1) {
+ 	if (asprintf(&per_session, "%s/.ssh/agent-%s-%s", pwent->pw_dir, hname, tty_nodir) == -1) {
+ 		pam_ssh_log(LOG_CRIT, "out of memory");

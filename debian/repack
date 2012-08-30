@@ -1,0 +1,98 @@
+#!/bin/sh
+
+PACKAGE_NAME=libpam-ssh
+
+set -e
+set -u
+
+usage() {
+	echo "Usage: repack --upstream-version <ver> <downloaded file>"
+	exit 1
+	}
+
+if [ "$#" != "3" ]; then
+	usage
+fi
+if [ "$1" != "--upstream-version" ]; then
+	usage
+fi
+if [ ! -f "$3" ]; then
+	if [ -n "$3" ]; then
+		echo "$3 doesn't exist"
+	fi
+	usage
+fi
+UPSTREAM_VERSION="$2"
+UPSTREAM_TARBALLZZ="$3"
+
+DEBIAN_SUFFIX="+ds"
+
+DEBIAN_UVERSION=${UPSTREAM_VERSION}${DEBIAN_SUFFIX}
+DEBIAN_ROOTFOLDERNAME="${PACKAGE_NAME}-${DEBIAN_UVERSION}.orig"
+DEBIAN_TARBALLXZ="$(dirname $UPSTREAM_TARBALLZZ)/${PACKAGE_NAME}_${DEBIAN_UVERSION}.orig.tar.xz"
+
+REPACK_TMPDIR=`mktemp -d ./repackXXXXXX`
+REPACK_TMPDIR=$(readlink -f "$REPACK_TMPDIR")
+trap "/bin/rm -rf \"$REPACK_TMPDIR\"" QUIT INT EXIT
+
+message() {
+	echo
+	echo "-- -- $1"
+	echo
+	}
+
+message "Repackaging $UPSTREAM_TARBALLZZ"
+
+UPSTREAM_ROOTFOLDER="${REPACK_TMPDIR}/unpacked"
+mkdir "${UPSTREAM_ROOTFOLDER}"
+tar -C "${UPSTREAM_ROOTFOLDER}" -xf "${UPSTREAM_TARBALLZZ}" || unzip -d "${UPSTREAM_ROOTFOLDER}" "${UPSTREAM_TARBALLZZ}"
+if [ `ls -1 "${UPSTREAM_ROOTFOLDER}" | wc -l` -eq 1 ]; then
+	UPSTREAM_ROOTFOLDER="${UPSTREAM_ROOTFOLDER}/`ls -1 "${UPSTREAM_ROOTFOLDER}"`"
+fi
+
+DEBIAN_ROOTFOLDER="${REPACK_TMPDIR}/${DEBIAN_ROOTFOLDERNAME}"
+## repack
+set -f
+REPACK_WORKING_FOLDER=$(pwd)
+cd "${UPSTREAM_ROOTFOLDER}"
+
+####. "${REPACK_WORKING_FOLDER}/debian/repack.local"
+## wipe out
+## clean up
+rm --verbose --force -- configure
+rm --verbose --force -- aclocal.m4
+rm --verbose --force -- Makefile.in
+rm --verbose --force -- config.guess
+rm --verbose --force -- config.sub
+rm --verbose --force -- depcomp
+rm --verbose --force -- install-sh
+rm --verbose --force -- mkinstalldirs
+rm --verbose --force -- mdate-sh
+rm --verbose --force -- missing
+rm --verbose --force -- ltmain.sh
+rm --verbose --force -- config.h.in
+chmod --verbose a+x bootstrap.sh
+
+cd ${REPACK_WORKING_FOLDER}
+set +f
+## end
+mv "${UPSTREAM_ROOTFOLDER}" "${DEBIAN_ROOTFOLDER}"
+
+REPACK_TARBALL="${REPACK_TMPDIR}/repacked.tar"
+REPACK_TARBALLXZ="${REPACK_TARBALL}.xz"
+tar -C "${REPACK_TMPDIR}" -cf "${REPACK_TARBALL}" "${DEBIAN_ROOTFOLDERNAME}"
+xz -9e < "${REPACK_TARBALL}" > "${REPACK_TARBALLXZ}"
+mv "${REPACK_TARBALLXZ}" "${DEBIAN_TARBALLXZ}"
+
+message "Testing ${DEBIAN_TARBALLXZ}"
+
+xz --verbose --test "${DEBIAN_TARBALLXZ}"
+
+message "Printing information about ${DEBIAN_TARBALLXZ}"
+
+xz --verbose --list "${DEBIAN_TARBALLXZ}"
+
+message "Quitting"
+
+##
+## eos

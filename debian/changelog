@@ -1,3 +1,34 @@
+libpam-ssh (1.97+ds-1) unstable; urgency=low
+
+  * Reintroduction release. (Closes: #685042, #664177)
+  * New maintainer.
+  * New upstream version.
+  * Bump debhelper build-dep to >= 9.
+  * Bump Standards Version to 3.9.3.
+  * Rewrite debian/rules:
+    - use dh sequencer with autoreconf support
+    - hardened
+    - mult-arch support.
+  * Convert debian/copyright to DEP-5 format.
+  * Revisit debian/control.
+  * Add repack support:
+    - add a dedicated debian/repack script
+    - add repack support in debian/watch
+    - add the optional get-orig-source target in debian/rules
+      to get the currently packaged upstream tarball and to repack it.
+  * Add a default target in debian/rules which basically queries package status
+    with uscan; output in DEHS format.
+  * Update OpenSSH embedded code.
+  * Add ECDSA keys support.
+  * Now files in $HOME/.ssh/login-keys.d with .disabled or .frozen as suffix
+    are ignored.
+  * Now TMPDIR and TMP are honoured when ssh-agent is spawned (implemented
+    with libpam-tmpdir package in mind).
+  * Revisit README.Debian and pam_ssh manpage to reflect changes.
+  * Minor fixes and enhancements, thanks to Peter Marschall.
+
+ -- Jerome Benoit <calculus@rezozer.net>  Sat, 25 Aug 2012 01:30:36 +0000
+
 libpam-ssh (1.92-14) unstable; urgency=low
 
   * Fix wrong use of pam-auth-update, thanks to Steve Langasek.

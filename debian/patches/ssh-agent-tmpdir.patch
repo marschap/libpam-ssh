@@ -1,0 +1,41 @@
+fix to honour TMP and TMPDIR
+Jerome Benoit <calculus@rezozer.net>
+--- a/pam_ssh.c
++++ b/pam_ssh.c
+@@ -335,7 +335,10 @@
+ 	pid_t child_pid;		/* child process that spawns agent */
+ 	int child_pipe[2];		/* pipe to child process */
+ 	int child_status;		/* child process status */
+-	char *arg[3], *env[1];		/* to pass to execve() */
++	const char *tmpdir; /* TMPDIR or TMP environment variable value */
++	char env_tmpdir[5+MAXPATHLEN]; /* TMP=$TMPDIR env equation to pass to execve() */
++	char *arg[3], *env[2];		/* to pass to execve() */
++	int retval;			/* from calls */
+ 
+ 	if (pipe(child_pipe) < 0) {
+ 		pam_ssh_log(LOG_ERR, "pipe: %m");
+@@ -387,10 +390,24 @@
+ 				_exit(EX_OSERR);
+ 			}
+ 		}
++
++		if ((tmpdir = pam_getenv(pamh, "TMPDIR")) == NULL) {
++			tmpdir = pam_getenv(pamh, "TMP");
++		}
++
+ 		arg[0] = "ssh-agent";
+ 		arg[1] = "-s";
+ 		arg[2] = NULL;
+ 		env[0] = NULL;
++		env[1] = NULL;
++
++		if (tmpdir != NULL) {
++			retval = snprintf(env_tmpdir, sizeof(env_tmpdir), "TMP=%s", tmpdir);
++			if (retval > 0 && (size_t)retval < sizeof(env_tmpdir))
++				env[0] = env_tmpdir;
++		}
++
++		pam_ssh_log(LOG_DEBUG, "start ssh-agent [%s]", env[0]?env[0]:"");
+ 		execve(PATH_SSH_AGENT, arg, env);
+ 		pam_ssh_log(LOG_ERR, "%s: %m", PATH_SSH_AGENT);
+ 		_exit(127);

@@ -1,0 +1,203 @@
+.\" Copyright (c) 2001 Mark R V Murray
+.\" All rights reserved.
+.\" Copyright (c) 2001 Networks Associates Technology, Inc.
+.\" All rights reserved.
+.\"
+.\" This software was developed for the FreeBSD Project by ThinkSec AS and
+.\" NAI Labs, the Security Research Division of Network Associates, Inc.
+.\" under DARPA/SPAWAR contract N66001-01-C-8035 ("CBOSS"), as part of the
+.\" DARPA CHATS research program.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. The name of the author may not be used to endorse or promote
+.\"    products derived from this software without specific prior written
+.\"    permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\" $Id: pam_ssh.8,v 1.7 2008/05/12 18:57:12 rosenauer Exp $
+.\"
+.\".Dd November 26, 2001
+.Dd August 24, 2011
+.Dt PAM_SSH 8
+.Os Debian
+.Sh NAME
+.Nm pam_ssh
+.Nd authentication and session management with SSH private keys
+.Sh SYNOPSIS
+.Op Ar service-name
+.Ar module-type
+.Ar control-flag
+.Pa pam_ssh
+.Op Ar options
+.Sh DESCRIPTION
+The
+SSH
+authentication service module for PAM,
+.Nm
+provides functionality for two PAM categories:
+authentication
+and session management.
+In terms of the
+.Ar module-type
+parameter, they are the
+.Dq Li auth
+and
+.Dq Li session
+features.
+It also provides null functions for the remaining categories.
+.Ss SSH Authentication Module
+The
+SSH
+authentication component
+verifies the identity of a user
+by prompting the user for a passphrase and verifying that it can
+decrypt at least one of the user's SSH login keys using that passphrase.
+.Pp
+The following options may be passed to the authentication module:
+.Bl -tag -width ".Cm use_first_pass"
+.It Cm debug
+.Xr syslog 3
+debugging information at
+.Dv LOG_DEBUG
+level.
+.It Cm use_first_pass
+If the authentication module
+is not the first in the stack,
+and a previous module
+obtained the user's password,
+that password is used
+decrypt the user's SSH login keys.
+If this fails,
+then the authentication module returns failure
+without prompting the user for a passphrase.
+.\"This option has no effect
+.\"if the authentication module
+.\"is the first in the stack,
+.\"or if no previous modules
+.\"obtained the user's password.
+.It Cm try_first_pass
+Similar to the
+.Cm use_first_pass
+option,
+except that if the previously obtained password fails
+to decrypt any of the SSH login keys,
+then the user is prompted for a SSH passphrase.
+.\".It Cm keyfiles
+.\"Specify the comma-separated list of files in
+.\".Pa $HOME/.ssh
+.\"to check for SSH keys.
+.\"The default is
+.\".Dq id_dsa,id_rsa,identity .
+.It Cm nullok
+Allow SSH keys with no passphrase.
+.El
+.Pp
+If neither
+.Cm use_first_pass
+nor
+.Cm try_first_pass
+is specified,
+.Nm pam_ssh
+will unconditionally ask for an SSH passphrase.
+.Pp
+In addition to the above authentication procedure, all
+standard SSH keys (identity, id_rsa, id_dsa, id_ecdsa) for which the
+obtained password matches will be decrypted.
+.Pp
+The now deprecated name
+.Cm allow_blank_passphrase
+for
+.Cm nullok
+is kept for compatibility reasons.
+.Ss SSH Session Management Module
+The
+SSH
+session management component
+initiates sessions by starting an SSH agent,
+passing it any SSH login keys it decrypted
+during the authentication phase,
+and sets the environment variables
+accordingly.
+.Pp
+The SSH
+session management component
+terminates the session by killing the previously started SSH agent
+by sending it a
+.Dv SIGTERM .
+.Pp
+The following options may be passed to the session management module:
+.Bl -tag -width ".Cm use_first_pass"
+.It Cm debug
+.Xr syslog 3
+debugging information at
+.Dv LOG_DEBUG
+level.
+.El
+.Sh INFORMATION LEAKS
+Be careful with the using the
+.Cm try_first_pass
+option when
+.Nm pam_ssh
+is the first authentication module
+because it will then leak information about existing users
+without login keys: such users will not be asked for a specific SSH
+passphrase, whereas non-existing users and existing users with
+login keys will be asked for a passphrase.
+.Sh FILES
+.Bl -tag -width ".Pa $HOME/.ssh/login-keys.d/" -compact
+.It Pa $HOME/.ssh/identity
+standard SSH1/SSH RSA key
+decrypted by pam_ssh
+.It Pa $HOME/.ssh/id_rsa
+standard SSH RSA key
+decrypted by pam_ssh
+.It Pa $HOME/.ssh/id_dsa
+standard SSH DSA key
+decrypted by pam_ssh
+.It Pa $HOME/.ssh/id_ecdsa
+standard SSH ECDSA key
+decrypted by pam_ssh
+.It Pa $HOME/.ssh/login-keys.d/
+location of (possibly symbolic links to) SSH RSA1/RSA/DSA/ECDSA keys
+.\"used for authentication and
+decrypted by pam_ssh
+(keys with .disabled or .frozen as suffix are ignored)
+.It Pa /var/log/auth.log
+Usual log file for
+.Xr syslog 3
+.El
+.Sh SEE ALSO
+.Xr ssh-agent 1 ,
+.Xr syslog 3 ,
+.Xr pam.conf 5 ,
+.Xr pam 8
+.Sh AUTHORS
+.Pp
+.An -nosplit
+.An "Andrew J. Korty" <ajk@iu.edu>
+wrote
+.Nm .
+.An "Dag-Erling Smorgrav"
+wrote the original OpenPAM support code.
+.An "Mark R V Murray"
+wrote the original version of this manual page.
+.An "Jens Peter Secher"
+introduced the login-key concept.

@@ -1,102 +1,257 @@
-This package was debianized by Aurelien Labrosse <aurelien.labrosse@free.fr> on
-Sun, 15 Feb 2004 19:59:55 +0100.
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0
+Upstream-Name: pam_ssh
+Upstream-Contact:
+ Andrew J. Korty <ajk@iu.edu>
+ Wolfgang Rosenauer <wolfgang@rosenauer.org>
+Source: http://sourceforge.net/projects/pam-ssh/
+Comment:
+ The upstream source tarball is repacked to drop off some weight
+ by cleaning up some unnecessary material.
 
-It was downloaded from http://sourceforge.net/projects/pam-ssh/
-
-Upstream Author: Andrew J. Korty <ajk@iu.edu>
-
+Files: *
 Copyright:
-    Redistribution and use in source and binary forms, with or without
-    modification, are permitted under the terms of the BSD License.
+ 1999, 2000, 2001, 2002, 2004 Andrew J. Korty <ajk@iu.edu>
+ 2006-2009 Wolfgang Rosenauer <wolfgang@rosenauer.org>
+License: BSD
 
-    THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
-    ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-    IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-    ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
-    FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-    DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
-    OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-    HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-    LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
-    OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
-    SUCH DAMAGE.
+Files:
+ authfd.c
+ authfd.h
+ authfile.c
+ authfile.h
+ bufaux.c
+ bufaux.h
+ bufbn.c
+ buffer.c
+ buffer.h
+ cipher.c
+ cipher.h
+ getput.h
+ includes.h
+ key.c
+ log.c
+ log.h
+ misc.h
+ rsa.c
+ rsa.h
+ ssh.h
+ xmalloc.c
+ xmalloc.h
+Copyright:
+ 1995 Tatu Ylonen <ylo@cs.hut.fi>
+License:
+ As far as I am concerned, the code I have written for this software
+ can be used freely for any purpose.  Any derived versions of this
+ software must be clearly marked as such, and if the derived work is
+ incompatible with the protocol description in the RFC file, it must be
+ called by a name other than "ssh" or "Secure Shell".
+Comment:
+ Embedded OpenSSH code
 
-On Debian systems, the complete text of the BSD License can be 
-found in `/usr/share/common-licenses/BSD'.
+Files:
+ authfd.c
+ authfile.c
+ bufaux.c
+ bufbn.c
+ cipher-3des1.c
+ cipher-bf1.c
+ cipher.c
+ cipher-ctr.c
+ cipher.h
+ cleanup.c
+ fatal.c
+ kex.h
+ key.c
+ key.h
+ log.c
+ misc.c
+ ssh2.h
+Copyright:
+ 1999, 2000, 2001, 2003 Markus Friedl <markus@openbsd.org>
+License: BSD-adhoc
+Comment:
+ Embedded OpenSSH code
 
-OpenPAM support code:
+Files:
+ cipher.c
+ rsa.c
+Copyright:
+ 1999 Niels Provos
+License: BSD-adhoc
+Comment:
+ Embedded OpenSSH codes.
 
-Copyright (c) 2001, 2002 Networks Associates Technology, Inc.
-All rights reserved.
+Files:
+ atomicio.c
+ atomicio.h
+Copyright:
+ 1995, 1999 Theo de Raadt
+License: BSD-adhoc
+Comment:
+ Embedded OpenSSH code
 
-Portions of this software were developed for the FreeBSD Project by
-ThinkSec AS and NAI Labs, the Security Research Division of Network
-Associates, Inc.  under DARPA/SPAWAR contract N66001-01-C-8035
-("CBOSS"), as part of the DARPA CHATS research program.
+Files:
+ atomicio.c
+Copyright:
+ 2005 Anil Madhavapeddy
+License: BSD-adhoc
+Comment:
+ Embedded OpenSSH codes.
 
+Files:
+ key.c
+Copyright:
+ 2008 Alexander von Gernler
+License: BSD-adhoc
+Comment:
+ Embedded OpenSSH code
 
-pam_get_pass() implementation:
+Files:
+ atomicio.c
+ atomicio.h
+ bufec.c
+ defines.h
+ misc.c
+Copyright:
+ 1999-2003, 2005, 2006, 2010 Damien Miller <djm@mindrot.org>
+License: BSD-adhoc
+Comment:
+ Embedded OpenSSH code
 
-Copyright 1998 Juniper Networks, Inc.
-All rights reserved.
+Files:
+ acss.c
+ acss.h
+ cipher-acss.c
+Copyright:
+ 2004 The OpenBSD project
+License:
+ Permission to use, copy, modify, and distribute this software for any
+ purpose with or without fee is hereby granted, provided that the above
+ copyright notice and this permission notice appear in all copies.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+Comment:
+ Embedded OpenSSH code
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-1. Redistributions of source code must retain the above copyright
-   notice, this list of conditions and the following disclaimer.
-2. Redistributions in binary form must reproduce the above copyright
-   notice, this list of conditions and the following disclaimer in the
-   documentation and/or other materials provided with the distribution.
+Files:
+ pam_get_pass.c
+ pam_get_pass.h
+ pam_option.h
+ pam_opttab.h
+ pam_std_option.c
+Copyright:
+ 1998 Juniper Networks, Inc.
+License: BSD-adhoc
+Comment:
+ OpenPAM support code
 
-THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
-OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
-OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
-SUCH DAMAGE.
+Files:
+ rijndael.c
+ rijndael.h
+Copyright:
+ Vincent Rijmen <vincent.rijmen@esat.kuleuven.ac.be>
+ Antoon Bosselaers <antoon.bosselaers@esat.kuleuven.ac.be>
+ Paulo Barreto <paulo.barreto@terra.com.br>
+License:
+ This code is hereby placed in the public domain.
+ .
+ THIS SOFTWARE IS PROVIDED BY THE AUTHORS ''AS IS'' AND ANY EXPRESS
+ OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHORS OR CONTRIBUTORS BE
+ LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
+ SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+Files:
+ strnvis.c
+ strnvis.h
+Copyright:
+ 1989, 1993 The Regents of the University of California
+License: BSD
 
-SSH code:
+Files: debian/*
+Copyright:
+ 2004-2005 Aurelien Labrosse <aurelien.labrosse@free.fr>
+ 2008-2010 Jens Peter Secher <jps@debian.org>
+ 2012 Jerome Benoit <calculus@rezozer.net>
+License: GPL-3+
+Comment:
+ This package was originally debianized by Aurelien Labrosse
+ <aurelien.labrosse@free.fr>.
 
-Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
-                   All rights reserved
-Functions for connecting the local authentication agent.
+License: BSD
+ Copyright (c) The Regents of the University of California.
+ All rights reserved.
+ .
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions
+ are met:
+ 1. Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+ 2. Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in the
+    documentation and/or other materials provided with the distribution.
+ 3. Neither the name of the University nor the names of its contributors
+    may be used to endorse or promote products derived from this software
+    without specific prior written permission.
+ .
+ THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ SUCH DAMAGE.
 
-As far as I am concerned, the code I have written for this software
-can be used freely for any purpose.  Any derived versions of this
-software must be clearly marked as such, and if the derived work is
-incompatible with the protocol description in the RFC file, it must be
-called by a name other than "ssh" or "Secure Shell".
+License: BSD-adhoc
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions
+ are met:
+ 1. Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+ 2. Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in the
+    documentation and/or other materials provided with the distribution.
+ .
+ THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-Copyright (c) 1995, 1999 Theo de Raadt.  All rights reserved.
-Copyright (c) 1999 Niels Provos.  All rights reserved.
-Copyright (c) 1999, 2000, 2001, 2003 Markus Friedl.  All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are
-met:
-
-1. Redistributions of source code must retain the above copyright
-   notice, this list of conditions and the following disclaimer.
-2. Redistributions in binary form must reproduce the above copyright
-   notice, this list of conditions and the following disclaimer in the
-   documentation and/or other materials provided with the
-   distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
-IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT,
-INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
-STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
-IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-POSSIBILITY OF SUCH DAMAGE.
+License: GPL-3+
+ This package is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; either version 3 of the License, or
+ (at your option) any later version.
+ .
+ This package is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ GNU General Public License for more details.
+ .
+ You should have received a copy of the GNU General Public License
+ along with this package. If not, see <http://www.gnu.org/licenses/>.
+ .
+ On Debian systems, the complete text of the GNU General
+ Public License version 3 can be found in "/usr/share/common-licenses/GPL-3".

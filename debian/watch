@@ -1,2 +1,4 @@
 version=3
-http://sf.net/pam-ssh/pam_ssh-(.+)\.tar\.(?:tar|bz2)
+opts="uversionmangle=s/_/\./,dversionmangle=s/\+ds//" \
+http://sf.net/pam-ssh/pam_ssh-(.+)\.tar\.(?:tar|bz2) \
+debian sh debian/repack

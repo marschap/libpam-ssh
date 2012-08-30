@@ -1,0 +1,26 @@
+return PAM_SESSION_ERR instead of PAM_AUTH_ERR in pam_sm_{open,close}_session()
+
+author: Peter Marschall
+
+communicated by Peter Marschall 
+
+--- a/pam_ssh.c
++++ b/pam_ssh.c
+@@ -829,7 +829,7 @@
+ 
+ 	if (!(user && (pwent = getpwnam(user)) && pwent->pw_dir && *pwent->pw_dir)) {
+ 		pam_ssh_log(LOG_ERR, "can't get home directory");
+-		return PAM_AUTH_ERR;
++		return PAM_SESSION_ERR;
+ 	}
+ 
+ 	retval = openpam_borrow_cred(pamh, pwent);
+@@ -1010,7 +1010,7 @@
+ 	if ((retval = pam_get_user(pamh, &user, NULL)) != PAM_SUCCESS)
+ 		return retval;
+ 	if (!(user && (pwent = getpwnam(user)) && pwent->pw_dir && *pwent->pw_dir))
+-		return PAM_AUTH_ERR;
++		return PAM_SESSION_ERR;
+ 
+ 	retval = openpam_borrow_cred(pamh, pwent);
+ 	if (retval != PAM_SUCCESS && retval != PAM_PERM_DENIED) {

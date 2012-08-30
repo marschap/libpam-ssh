@@ -1,0 +1,37 @@
+debianization
+--- a/configure.ac
++++ b/configure.ac
+@@ -28,11 +28,14 @@
+ dnl Process this file with autoconf to produce a configure script.
+ 
+ AC_INIT([pam_ssh],[1.97],[ajk@ajk.name])
++AC_CONFIG_MACRO_DIR([m4])
++AC_CONFIG_AUX_DIR([config])
+ AC_CONFIG_HEADERS([config.h])
+ AC_CONFIG_SRCDIR([pam_ssh.c])
+ AC_CANONICAL_TARGET([])
+ AM_DISABLE_STATIC
+ AM_INIT_AUTOMAKE(pam_ssh, 1.97)
++AM_MAINTAINER_MODE
+ AM_PROG_LIBTOOL
+ AC_SUBST(LIBTOOL_DEPS)
+ 
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -25,7 +25,7 @@
+ # $Id: Makefile.am,v 1.19 2008/05/12 18:57:12 rosenauer Exp $
+ 
+ lib_LTLIBRARIES			= pam_ssh.la
+-pam_ssh_la_LDFLAGS		= -avoid-version -module
++pam_ssh_la_LDFLAGS		= -avoid-version -module -Wl,--version-script,debian/pam_ssh.version
+ pam_ssh_la_LIBADD		= @LTLIBOBJS@
+ pam_ssh_la_SOURCES = \
+ 	misc.c misc.h \
+@@ -43,6 +43,7 @@
+ man_MANS			= pam_ssh.8
+ AM_CFLAGS			= -Wall
+ AUTOMAKE_OPTIONS		= dist-bzip2
++ACLOCAL_AMFLAGS = -I m4
+ EXTRA_pam_ssh_la_SOURCES	= openpam_cred.h pam_opttab.h pam_option.h \
+ 				  pam_get_pass.h strlcpy.h strnvis.h
+ EXTRA_DIST			= $(man_MANS) bootstrap.sh pam_ssh.spec \

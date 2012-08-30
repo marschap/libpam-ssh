@@ -1,10 +1,14 @@
 ## Fix missing syslog include.
 ## Originally 04_fix_syslogh_inclusion.dpatch by Nico Golde <nion@debian.org>
-
-diff -urNad libpam-ssh-1.91.0~/pam_ssh.c libpam-ssh-1.91.0/pam_ssh.c
---- libpam-ssh-1.91.0~/pam_ssh.c	2004-04-12 15:55:08.000000000 +0200
-+++ libpam-ssh-1.91.0/pam_ssh.c	2007-08-30 17:16:05.000000000 +0200
-@@ -59,6 +59,7 @@
+--- a/pam_ssh.c
++++ b/pam_ssh.c
+@@ -1,4 +1,4 @@
+-/*-
++/*
+  * Copyright (c) 2006 Wolfgang Rosenauer
+  * All rights reserved.
+  * 
+@@ -62,6 +62,7 @@
  #include <pwd.h>
  #include <signal.h>
  #include <stdio.h>

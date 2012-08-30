@@ -1,0 +1,106 @@
+reimplement ssh_get_authentication_connection[_authsocket](const char *authsocket)
+--- a/authfd.h
++++ b/authfd.h
+@@ -67,10 +67,12 @@
+ }	AuthenticationConnection;
+ 
+ ////int	ssh_agent_present(void);
+-int	ssh_get_authentication_socket(void);
++int	ssh_get_authentication_socket_authsocket(const char *authsocket);
++////int	ssh_get_authentication_socket(void);
+ void	ssh_close_authentication_socket(int);
+ 
+-AuthenticationConnection *ssh_get_authentication_connection(void);
++AuthenticationConnection *ssh_get_authentication_connection_authsocket(const char *authsocket);
++////AuthenticationConnection *ssh_get_authentication_connection(void);
+ void	ssh_close_authentication_connection(AuthenticationConnection *);
+ ////int	 ssh_get_num_identities(AuthenticationConnection *, int);
+ ////Key	*ssh_get_first_identity(AuthenticationConnection *, char **, int);
+--- a/authfd.c
++++ b/authfd.c
+@@ -95,16 +95,11 @@
+ /* Returns the number of the authentication fd, or -1 if there is none. */
+ 
+ int
+-ssh_get_authentication_socket(void)
++ssh_get_authentication_socket_authsocket(const char *authsocket)
+ {
+-	const char *authsocket;
+ 	int sock;
+ 	struct sockaddr_un sunaddr;
+ 
+-	authsocket = getenv(SSH_AUTHSOCKET_ENV_NAME);
+-	if (!authsocket)
+-		return -1;
+-
+ 	bzero(&sunaddr, sizeof(sunaddr));
+ 	sunaddr.sun_family = AF_UNIX;
+ 	strlcpy(sunaddr.sun_path, authsocket, sizeof(sunaddr.sun_path));
+@@ -126,6 +121,20 @@
+ 	return sock;
+ }
+ 
++#if 0
++int
++ssh_get_authentication_socket(void)
++{
++	const char *authsocket;
++
++	authsocket = getenv(SSH_AUTHSOCKET_ENV_NAME);
++	if (!authsocket)
++		return -1;
++
++	return ssh_get_authentication_socket_authsocket(authsocket);
++}
++#endif
++
+ static int
+ ssh_request_reply(AuthenticationConnection *auth, Buffer *request, Buffer *reply)
+ {
+@@ -195,6 +204,38 @@
+  */
+ 
+ AuthenticationConnection *
++ssh_get_authentication_connection_authsocket(const char *authsocket)
++{
++	AuthenticationConnection *auth;
++	int sock;
++
++	sock = ssh_get_authentication_socket_authsocket(authsocket);
++
++	/*
++	 * Fail if we couldn't obtain a connection.  This happens if we
++	 * exited due to a timeout.
++	 */
++	if (sock < 0)
++		return NULL;
++
++	auth = xmalloc(sizeof(*auth));
++	auth->fd = sock;
++	buffer_init(&auth->identities);
++	auth->howmany = 0;
++
++	return auth;
++}
++
++#if 0
++/*
++ * Opens and connects a private socket for communication with the
++ * authentication agent.  Returns the file descriptor (which must be
++ * shut down and closed by the caller when no longer needed).
++ * Returns NULL if an error occurred and the connection could not be
++ * opened.
++ */
++
++AuthenticationConnection *
+ ssh_get_authentication_connection(void)
+ {
+ 	AuthenticationConnection *auth;
+@@ -216,6 +257,7 @@
+ 
+ 	return auth;
+ }
++#endif
+ 
+ /*
+  * Closes the connection to the authentication agent and frees any associated

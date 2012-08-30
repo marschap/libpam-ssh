@@ -2,13 +2,14 @@ Per-user setup
 --------------
 
 pam_ssh will try to decrypt the traditional SSH keys, that is, files
-matching $HOME/.ssh/id(entity|_(r|d)sa).  pam_ssh will also try to
+matching $HOME/.ssh/id(entity|_(r|d|ecd)sa).  pam_ssh will also try to
 decrypt all keys in the directory $HOME/.ssh/login-keys.d, and (if
 your system administrator has configured your system thus) allow you
-to log in using any of these login keys.  So if you want to log in by
+to log in using any of these login keys. So if you want to log in by
 using an SSH key passphrase, you should create a login-keys.d
 directory and in this directory create (symbolic links to) all the
-keys you want to use as login keys.
+keys you want to use as login keys. Nevertheless keys in the directory
+$HOME/.ssh/login-keys.d with .disabled or .frozen as suffix are ignored.
 
 All SSH keys that are successfully decrypted will be added to the
 ssh-agent.
@@ -87,9 +88,20 @@ which will unconditionally ask the user for a SSH passphrase, and only
 authenticate the user if this passphrase decrypts any of the SSH keys
 in $HOME/.ssh/login-keys.d/.
 
+Finally, pam_ssh honours TMPDIR and TMP before spawning ssh-agent, namely
+ssh-agent is asked to place its agent file in TMPDIR or TMP. pam_tmpdir
+from the libpam-tmpdir can be used to set up TMP and TMPDIR as follows:
+
+  ...
+  @include common-session
+  session optional pam_tmpdir.so
+  session optional pam_ssh.so
+  ...
+
 
 See also "man pam_ssh", and
 http://content.hccfl.edu/pollock/AUnix2/PAM-Help.htm for a good
 introduction to PAM.
 
  -- Jens Peter Secher <jps@debian.org>, Sun, 28 Feb 2010 12:49:51 +0100
+ -- Jerome Benoit <calculus@rezozer.net>, Fri, 24 Aug 2012 23:21:21 +0000
