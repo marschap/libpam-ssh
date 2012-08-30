@@ -1,0 +1,12 @@
+update pam_ssh code with respect to updated openssh embedded code
+--- a/pam_ssh.c
++++ b/pam_ssh.c
+@@ -352,7 +352,7 @@
+ 		free(data_name);
+ 		if (retval != PAM_SUCCESS)
+ 			break;
+-		retval = ssh_add_identity(ac, key, comment);
++		retval = ssh_add_identity_constrained(ac, key, comment, 0, 0);
+ 		if (!final)
+ 			final = retval;
+ 	}
