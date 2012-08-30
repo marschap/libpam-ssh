@@ -1,0 +1,2 @@
+debian/silent-ssh-single-sign-on usr/share/pam-configs
+lib/*/security/pam_ssh.so

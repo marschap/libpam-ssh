@@ -10,9 +10,6 @@ override_dh_auto_configure:
 	dh_auto_configure -- --with-pam-dir=/lib/$(DEB_HOST_MULTIARCH)/security
 
 override_dh_auto_install:
-	dh_auto_install
-	rm -f debian/libpam-ssh/lib/$(DEB_HOST_MULTIARCH)/security/pam_ssh.la
-	install -D -m 644 debian/pam-auth-update.silent-ssh-single-sign-on \
-		debian/libpam-ssh/usr/share/pam-configs/silent-ssh-single-sign-on
+	dh_auto_install --destdir debian/tmp/
 
 # EOF
