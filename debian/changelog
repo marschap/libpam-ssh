@@ -1,3 +1,22 @@
+libpam-ssh (1.97-0pm3) unstable; urgency=low
+
+  * debian/libpam-ssh.manpages: new
+  * debian/copyright: update
+  * patches/include-syslog.patch: re-introduce
+  * patches/fix-upstream-autotools.patch: new
+  * debian/rules: enable all hardening flags
+  * debian/{rules,libpam-ssh.install}: simplify installation
+  * debian/{rules,control}: Multi-Arch:-ify
+  * debian/{control,compat}: update
+  * debian/patches/adapt-embedded_code-openssh.patch: new
+  * debian/patches/disambiguate-embedded_code-openssh.patch: new
+  * debian/patches/setgid.patch: refresh
+  * debian/patches/reduce-debug-logging.diff: refresh
+  * debian/patches/update-pam_ssh.patch: new
+  * debian/patches/update-embedded_code-openssh.patch: new
+
+ -- Peter Marschall <peter@adpm.de>  Thu, 30 Aug 2012 19:20:43 +0200
+
 libpam-ssh (1.97-0pm2) unstable; urgency=low
 
   * debian/patches/return-PAM_SESSION_ERR.diff: DEP-3 update
