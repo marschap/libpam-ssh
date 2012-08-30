@@ -1,5 +1,6 @@
 update-embedded_code-openssh.patch
 disambiguate-embedded_code-openssh.patch
+adapt-embedded_code-openssh.patch
 update-pam_ssh.patch
 return-PAM_SESSION_ERR.diff
 reduce-debug-logging.diff
