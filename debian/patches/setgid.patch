@@ -5,15 +5,33 @@ Description: Correctly drop priviledges when spawning ssh-agent.
 Origin: vendor, http://bugzillafiles.novell.org/attachment.cgi?id=432434
 Bug-OpenSuSE: https://bugzilla.novell.com/show_bug.cgi?id=665061
 
---- pam_ssh-1.97/pam_ssh.c
-+++ pam_ssh-1.97/pam_ssh.c
-@@ -684,7 +684,8 @@ pam_sm_open_session(pam_handle_t *pamh,
+--- a/pam_ssh.c
++++ b/pam_ssh.c
+@@ -66,6 +66,7 @@
+ #include <string.h>
+ #include <sysexits.h>
+ #include <unistd.h>
++#include <grp.h>
+ #include <time.h>
+ 
+ #define PAM_SM_AUTH
+@@ -667,7 +668,8 @@ pam_sm_open_session(pam_handle_t *pamh,
+ 			/* NOTREACHED */
+ 		case 0:		/* child */
+ 
+-			/* Permanently drop privileges using setuid()
++			/* Permanently drop privileges using initgroups(),
++			   setuid(), and setgid()
+ 			   before executing ssh-agent so that root
+ 			   privileges can't possibly be regained (some
+ 			   ssh-agents insist that euid == ruid
+@@ -684,7 +686,8 @@ pam_sm_open_session(pam_handle_t *pamh,
  				_exit(EX_OSERR);
  				/* NOTREACHED */
  			case PAM_SUCCESS:
 -				if (setuid(pwent->pw_uid) == -1) {
 +				if (initgroups(pwent->pw_name, pwent->pw_gid) == -1 ||
-+				setgid(pwent->pw_gid) == -1 || setuid(pwent->pw_uid) == -1) {
++				    setgid(pwent->pw_gid) == -1 || setuid(pwent->pw_uid) == -1) {
  					pam_ssh_log(LOG_ERR,
  					    "can't drop privileges: %m",
  					    pwent->pw_uid);
