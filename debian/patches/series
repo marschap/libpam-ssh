@@ -1,3 +1,4 @@
+update-embedded_code-openssh.patch
 return-PAM_SESSION_ERR.diff
 reduce-debug-logging.diff
 #fix-try-first-password.diff
