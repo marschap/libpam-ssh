@@ -1,0 +1,12 @@
+upstream fixes for the autotools machinery
+--- a/acinclude.m4
++++ b/acinclude.m4
+@@ -26,7 +26,7 @@
+ dnl
+ dnl --with-pam-libdir (based on macro from pam_krb5 1.0.3)
+ dnl
+-AC_DEFUN(AC_CHECK_PAM, 
++AC_DEFUN([AC_CHECK_PAM],
+ [
+     AC_ARG_WITH(pam-dir,
+     AC_HELP_STRING(--with-pam-dir=dir,
