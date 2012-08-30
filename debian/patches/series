@@ -7,3 +7,4 @@ describe-allow-blank-passphrase.diff
 avoid-leaking-usernames.diff
 handle-no-controlling-tty.diff
 fix-manpage-warning.diff
+fix-debian-adhoc.patch

@@ -13,6 +13,7 @@ endif
 ## Setup ./configure arguments to fit Debian environment.
 export DEB_HOST_GNU_TYPE ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
 export DEB_BUILD_GNU_TYPE ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
+DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 config_flags := \
 	--config-cache \
 	--enable-debug \
@@ -21,6 +22,7 @@ config_flags := \
 	--mandir=/usr/share/man \
 	--infodir=/usr/share/info \
 	--libexecdir=/usr/lib \
+	--with-pam-dir=/lib/$(DEB_HOST_MULTIARCH)/security \
 	--build $(DEB_BUILD_GNU_TYPE)
 ifneq ($(DEB_BUILD_GNU_TYPE), $(DEB_HOST_GNU_TYPE))
 	config_flags += --host $(DEB_HOST_GNU_TYPE)
@@ -35,7 +37,7 @@ configure: configure-stamp
 ## Configure using uptodate config.{sub,guess}.
 configure-stamp:
 	dh_testdir
-	ln -sf /usr/share/misc/config.sub /usr/share/misc/config.guess $(CURDIR)
+	dh_autoreconf
 	$(SHELL) $(CURDIR)/configure $(config_flags) CFLAGS="$(cflags)"
 	touch $@
 
@@ -43,7 +45,7 @@ build: configure build-stamp
 
 build-stamp:
 	dh_testdir
-	$(MAKE) CFLAGS="$(cflags) -Wl,--version-script,debian/pam_ssh.version"
+	dh_auto_build
 	touch $@
 
 install-stamp: build-stamp
@@ -51,8 +53,7 @@ install-stamp: build-stamp
 	dh_testroot
 	dh_prep
 	$(MAKE) install DESTDIR=$(destdir)
-	libtool --quiet --finish $(destdir)/lib/security/
-	rm -f $(destdir)/lib/security/pam_ssh.la
+	rm -f $(destdir)/lib/$(DEB_HOST_MULTIARCH)/security/pam_ssh.la
 	install -D -m 644 debian/pam-auth-update.silent-ssh-single-sign-on \
 		 $(destdir)/usr/share/pam-configs/silent-ssh-single-sign-on
 	touch $@
@@ -80,8 +81,8 @@ binary: binary-indep binary-arch
 clean:
 	dh_testdir
 	dh_testroot
-	[ ! -f Makefile ] || make distclean
-	rm -f configure-stamp build-stamp install-stamp config.guess config.sub
+	dh_auto_clean
+	dh_autoreconf_clean
 	dh_clean
 
 .PHONY: configure build binary binary-indep binary-arch clean

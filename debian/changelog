@@ -1,3 +1,12 @@
+libpam-ssh (1.92-15) unstable; urgency=low
+
+  * Reintroduction release. (Closes: #685042, #664177)
+  * New maintainer.
+  * Fix rebuild issue caused by libtool. (Closes: #634577)
+  * debian/rules sligtly clean up.
+
+ -- Jerome Benoit <calculus@rezozer.net>  Tue, 28 Aug 2012 08:09:17 +0000
+
 libpam-ssh (1.92-14) unstable; urgency=low
 
   * Fix wrong use of pam-auth-update, thanks to Steve Langasek.
