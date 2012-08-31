@@ -1,14 +1,3 @@
-libpam-ssh (1.97-0pm1) unstable; urgency=low
-
-    This release of libpam-ssh reverts all the Debian-specific changes
-    from previous versions; instead it tries to stay as close to upstream
-    as possible.
-
-    Especially, it demps the undocumented "login keys" feature and
-    resurrects the 'keyfiles' option.
-
- -- Peter Marschall <peter@adpm.de>  Sat, 17 Dec 2011 19:44:20 +0100
-
 libpam-ssh (1.92-1) unstable; urgency=low
 
     The PAM module configuration line must now be directly inserted into
