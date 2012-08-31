@@ -13,7 +13,7 @@ ssh-agent-setgid_and_sigmask.patch
 fix-try-first-password.patch
 handle-no-controlling-tty.patch
 return-PAM_SESSION_ERR.diff
-reduce-debug-logging.diff
+#reduce-debug-logging.diff
 update-pam_ssh-manpage.patch
 #double-free.patch
 EOF-password.patch
