@@ -14,7 +14,7 @@ fix-try-first-password.patch
 handle-no-controlling-tty.patch
 return-PAM_SESSION_ERR.diff
 reduce-debug-logging.diff
-describe-allow-blank-passphrase.diff
+update-pam_ssh-manpage.patch
 #double-free.patch
 EOF-password.patch
 fix-upstream-autotools.patch

@@ -1,0 +1,191 @@
+Update man page to the way the current code works.
+communicated by: Jerome Benoit <calculus@rezozer>
+with some fixes of my own
+
+--- a/pam_ssh.8
++++ b/pam_ssh.8
+@@ -34,9 +34,9 @@
+ .\"
+ .\" $Id: pam_ssh.8,v 1.7 2008/05/12 18:57:12 rosenauer Exp $
+ .\"
+-.Dd November 26, 2001
++.Dd August 31, 2012
+ .Dt PAM_SSH 8
+-.Os
++.Os Linux
+ .Sh NAME
+ .Nm pam_ssh
+ .Nd authentication and session management with SSH private keys
+@@ -66,10 +66,9 @@
+ The
+ SSH
+ authentication component
+-provides a function to verify the identity of a user
+-.Pq Fn pam_sm_authenticate ,
++verifies the identity of a user
+ by prompting the user for a passphrase and verifying that it can
+-decrypt the target user's SSH key using that passphrase.
++decrypt at least one of the user's SSH login keys using that passphrase.
+ .Pp
+ The following options may be passed to the authentication module:
+ .Bl -tag -width ".Cm use_first_pass"
+@@ -83,50 +82,70 @@
+ is not the first in the stack,
+ and a previous module
+ obtained the user's password,
+-that password is used
+-to authenticate the user.
++then that password is used
++to decrypt the user's SSH login keys.
+ If this fails,
+-the authentication module returns failure
+-without prompting the user for a password.
+-This option has no effect
+-if the authentication module
+-is the first in the stack,
+-or if no previous modules
+-obtained the user's password.
++then the authentication module returns failure
++without prompting the user for a passphrase.
++.\"This option has no effect
++.\"if the authentication module
++.\"is the first in the stack,
++.\"or if no previous modules
++.\"obtained the user's password.
+ .It Cm try_first_pass
+-This option is similar to the
++Similar to the
+ .Cm use_first_pass
+ option,
+-except that if the previously obtained password fails,
+-the user is prompted for another password.
+-.It Cm keyfiles
+-Specify the comma-separated list of files in
+-.Pa $HOME/.ssh
+-to check for SSH keys.
+-The default is
+-.Dq id_dsa,id_rsa,identity .
++except that if the previously obtained password fails
++to decrypt any of the SSH login keys,
++then the user is prompted for an SSH passphrase.
++.Pp
++.Cm try_first_pass
++has no effect if
++.Nm pam_ssh
++is the first module on the stack,
++or if no previous modules
++obtained the user's password.
++.\".It Cm keyfiles
++.\"Specify a comma-separated list of files in
++.\".Pa $HOME/.ssh
++.\"to check for SSH keys.
++.\"The default is
++.\".Dq id_ecdsa,id_dsa,id_rsa,identity .
+ .It Cm nullok
+-Allow empty passphrases.
++Allow SSH keys without passphrase.
+ .El
++.Pp
++If neither
++.Cm use_first_pass
++nor
++.Cm try_first_pass
++is specified,
++.Nm pam_ssh
++will unconditionally ask for an SSH passphrase.
++.Pp
++In addition to the above authentication procedure, all
++standard SSH keys (identity, id_rsa, id_dsa, id_ecdsa) for which the
++obtained password matches will be decrypted.
++.Pp
++The now deprecated name
++.Cm allow_blank_passphrase
++for
++.Cm nullok
++is kept for compatibility reasons.
+ .Ss SSH Session Management Module
+ The
+ SSH
+ session management component
+-provides functions to initiate
+-.Pq Fn pam_sm_open_session
+-and terminate
+-.Pq Fn pam_sm_close_session
+-sessions.
+-The
+-.Fn pam_sm_open_session
+-function starts an SSH agent,
+-passing it any private keys it decrypted
++initiates sessions by starting an SSH agent,
++passing it any SSH login keys it decrypted
+ during the authentication phase,
+ and sets the environment variables
+-the agent specifies.
+-The
+-.Fn pam_sm_close_session
+-function kills the previously started SSH agent
++accordingly.
++.Pp
++The SSH
++session management component
++terminates the session by killing the previously started SSH agent
+ by sending it a
+ .Dv SIGTERM .
+ .Pp
+@@ -138,22 +157,42 @@
+ .Dv LOG_DEBUG
+ level.
+ .El
++.Sh INFORMATION LEAKS
++Be careful with the using the
++.Cm try_first_pass
++option when
++.Nm pam_ssh
++is the first authentication module
++because it will then leak information about existing users
++without login keys: such users will not be asked for a specific SSH
++passphrase, whereas non-existing users and existing users with
++login keys will be asked for a passphrase.
+ .Sh FILES
+-.Bl -tag -width ".Pa $HOME/.ssh2/id_dsa_*" -compact
++.Bl -tag -width ".Pa $HOME/.ssh/login-keys.d/" -compact
+ .It Pa $HOME/.ssh/identity
+-SSH1/OpenSSH RSA key
++Standard SSH1/SSH RSA key
++decrypted by pam_ssh
++.It Pa $HOME/.ssh/id_rsa
++Standard SSH RSA key
++decrypted by pam_ssh
+ .It Pa $HOME/.ssh/id_dsa
+-OpenSSH DSA key
+-.It Pa $HOME/.ssh2/id_rsa_*
+-SSH2 RSA keys
+-.It Pa $HOME/.ssh2/id_dsa_*
+-SSH2 DSA keys
++Standard SSH DSA key
++decrypted by pam_ssh.
++.It Pa $HOME/.ssh/id_ecdsa
++Standard SSH ECDSA key
++decrypted by pam_ssh.
++.It Pa $HOME/.ssh/login-keys.d/
++Location of (possibly symbolic links to) OpenSSH DSA/RSA keys used for
++authentication and decrypted by pam_ssh.
++.It Pa /var/log/auth.log
++Usual log file for
++.Xr syslog 3
+ .El
+ .Sh SEE ALSO
+ .Xr ssh-agent 1 ,
+ .Xr syslog 3 ,
+ .Xr pam.conf 5 ,
+-.Xr pam 8
++.Xr pam 8 .
+ .Sh AUTHORS
+ .Pp
+ .An -nosplit
+@@ -164,3 +203,5 @@
+ wrote the original OpenPAM support code.
+ .An "Mark R V Murray"
+ wrote the original version of this manual page.
++.An "Jens Peter Secher"
++introduced the login-key concept.
