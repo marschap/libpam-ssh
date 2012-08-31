@@ -3,6 +3,7 @@ disambiguate-embedded_code-openssh.patch
 adapt-embedded_code-openssh.patch
 update-pam_ssh.patch
 include-syslog.patch
+start-ssh-agent.patch
 return-PAM_SESSION_ERR.diff
 reduce-debug-logging.diff
 #fix-try-first-password.diff
