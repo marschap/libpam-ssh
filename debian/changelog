@@ -1,3 +1,17 @@
+libpam-ssh (1.97-0pm4) unstable; urgency=low
+
+  * debian/patches/start-ssh-agent.patch: re-introduce
+  * debian/patches/ssh-agent-tmpdir.patch: new
+  * debian/patches/ssh-agent-setgid_and_sigmask.patch: new
+  * debian/patches/fix-try-first-password.patch: re-introduce
+  * debian/patches/handle-no-controlling-tty.patch: re-introduce
+  * debian/patch/return-PAM_SESSION_ERR.diff: refresh
+  * debian/patches/double-free.patch: ignore
+  * debian/patches/update-pam_ssh-manpage.patch: new
+  * debian/NEWS.Debian: updated
+
+ -- Peter Marschall <peter@adpm.de>  Fri, 31 Aug 2012 10:57:26 +0200
+
 libpam-ssh (1.97-0pm3) unstable; urgency=low
 
   * debian/libpam-ssh.manpages: new
