@@ -5,12 +5,15 @@ update-pam_ssh.patch
 include-syslog.patch
 start-ssh-agent.patch
 ssh-agent-tmpdir.patch  
+ssh-agent-setgid_and_sigmask.patch
+# superseded by ssh-agent-setgid_and_sigmask.patch
+#setgid.patch
+#superseded by ssh-agent-setgid_and_sigmask.patch
+#sigmask.patch
 return-PAM_SESSION_ERR.diff
 reduce-debug-logging.diff
 #fix-try-first-password.diff
 describe-allow-blank-passphrase.diff
-setgid.patch
-sigmask.patch
 double-free.patch
 EOF-password.patch
 fix-upstream-autotools.patch

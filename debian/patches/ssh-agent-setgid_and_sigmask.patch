@@ -1,0 +1,74 @@
+reset sigmask before spawning ssh-agent [1];
+correctly drop priviledges when spawning ssh-agent [2].
+
+adapted from patches communicated by Peter Marschall:
+[1]
+	Origin: vendor, https://bugzilla.novell.com/attachment.cgi?id=459464
+	Bug-OpenSuSE: https://bugzilla.novell.com/show_bug.cgi?id=727246
+[2]
+	Origin: vendor, http://bugzillafiles.novell.org/attachment.cgi?id=432434
+	Bug-OpenSuSE: https://bugzilla.novell.com/show_bug.cgi?id=665061
+
+
+--- a/pam_ssh.c
++++ b/pam_ssh.c
+@@ -67,6 +67,7 @@
+ #include <string.h>
+ #include <sysexits.h>
+ #include <unistd.h>
++#include <grp.h>
+ #include <time.h>
+ 
+ #define PAM_SM_AUTH
+@@ -330,11 +331,12 @@
+ }
+ 
+ static int
+-start_ssh_agent(pam_handle_t *pamh, uid_t uid, FILE **env_read)
++start_ssh_agent(pam_handle_t *pamh, uid_t uid, gid_t gid, const char * name, FILE **env_read)
+ {
+ 	pid_t child_pid;		/* child process that spawns agent */
+ 	int child_pipe[2];		/* pipe to child process */
+ 	int child_status;		/* child process status */
++	sigset_t sigmask;		/* blocked signal mask */
+ 	const char *tmpdir; /* TMPDIR or TMP environment variable value */
+ 	char env_tmpdir[5+MAXPATHLEN]; /* TMP=$TMPDIR env equation to pass to execve() */
+ 	char *arg[3], *env[2];		/* to pass to execve() */
+@@ -353,7 +355,8 @@
+ 		/* NOTREACHED */
+ 	case 0:		/* child */
+ 
+-		/* Permanently drop privileges using setuid()
++		/* Permanently drop privileges using setuid(),
++			 setguid(), and initgroups()
+ 			 before executing ssh-agent so that root
+ 			 privileges can't possibly be regained (some
+ 			 ssh-agents insist that euid == ruid
+@@ -369,7 +372,7 @@
+ 			_exit(EX_OSERR);
+ 			/* NOTREACHED */
+ 		case PAM_SUCCESS:
+-			if (setuid(uid) == -1) {
++			if ((initgroups(name, gid) == -1) || (setgid(gid) == -1) || (setuid(uid) == -1)) {
+ 				pam_ssh_log(LOG_ERR, "can't drop privileges: %m", uid);
+ 				_exit(EX_NOPERM);
+ 			}
+@@ -395,6 +398,9 @@
+ 			tmpdir = pam_getenv(pamh, "TMP");
+ 		}
+ 
++		sigemptyset(&sigmask);
++		sigprocmask(SIG_SETMASK, &sigmask, NULL);
++
+ 		arg[0] = "ssh-agent";
+ 		arg[1] = "-s";
+ 		arg[2] = NULL;
+@@ -756,7 +762,7 @@
+ 			no_link = 1;
+ 		if (!env_read) {
+ 			start_agent = 1;
+-			if ((retval = start_ssh_agent(pamh, pwent->pw_uid, &env_read)) != PAM_SUCCESS) {
++			if ((retval = start_ssh_agent(pamh, pwent->pw_uid, pwent->pw_gid, pwent->pw_name, &env_read)) != PAM_SUCCESS) {
+ 			close(env_write);
+ 			openpam_restore_cred(pamh);
+ 			return retval;
