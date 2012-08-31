@@ -1,5 +1,5 @@
 update-embedded_code-openssh.patch
-disambiguate-embedded_code-openssh.patch
+fix-use-pam_ssh_log.patch
 adapt-embedded_code-openssh.patch
 update-pam_ssh.patch
 include-syslog.patch

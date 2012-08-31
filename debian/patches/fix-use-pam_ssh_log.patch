@@ -1,0 +1,3327 @@
+--- a/authfd.c
++++ b/authfd.c
+@@ -60,7 +60,7 @@
+ #include "cipher.h"
+ #include "kex.h"
+ ////#include "compat.h"
+-#include "log.h"
++#include "pam_ssh_log.h"
+ #include "atomicio.h"
+ #include "misc.h"
+ #include "strlcpy.h"
+@@ -140,7 +140,7 @@
+ 	if (atomicio(vwrite, auth->fd, buf, 4) != 4 ||
+ 	    atomicio(vwrite, auth->fd, buffer_ptr(request),
+ 	    buffer_len(request)) != buffer_len(request)) {
+-		error("Error writing to authentication socket.");
++		pam_ssh_log(LOG_ERR/*error*/, "error: Error writing to authentication socket.");
+ 		return 0;
+ 	}
+ 	/*
+@@ -148,14 +148,14 @@
+ 	 * response packet.
+ 	 */
+ 	if (atomicio(read, auth->fd, buf, 4) != 4) {
+-	    error("Error reading response length from authentication socket.");
++	    pam_ssh_log(LOG_ERR/*error*/, "error: Error reading response length from authentication socket.");
+ 	    return 0;
+ 	}
+ 
+ 	/* Extract the length, and check it for sanity. */
+ 	len = get_u32(buf);
+ 	if (len > 256 * 1024)
+-		fatal("Authentication response too long: %u", len);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: Authentication response too long: %u", len);
+ 
+ 	/* Read the rest of the response in to the buffer. */
+ 	buffer_clear(reply);
+@@ -164,7 +164,7 @@
+ 		if (l > sizeof(buf))
+ 			l = sizeof(buf);
+ 		if (atomicio(read, auth->fd, buf, l) != l) {
+-			error("Error reading response from authentication socket.");
++			pam_ssh_log(LOG_ERR/*error*/, "error: Error reading response from authentication socket.");
+ 			return 0;
+ 		}
+ 		buffer_append(reply, buf, l);
+@@ -295,13 +295,13 @@
+ 	if (agent_failed(type)) {
+ 		return 0;
+ 	} else if (type != code2) {
+-		fatal("Bad authentication reply message type: %d", type);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: Bad authentication reply message type: %d", type);
+ 	}
+ 
+ 	/* Get the number of entries in the response and check it for sanity. */
+ 	auth->howmany = buffer_get_int(&auth->identities);
+ 	if ((u_int)auth->howmany > 1024)
+-		fatal("Too many identities in authentication reply: %d",
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: Too many identities in authentication reply: %d",
+ 		    auth->howmany);
+ 
+ 	return auth->howmany;
+@@ -346,7 +346,7 @@
+ 		*comment = buffer_get_string(&auth->identities, NULL);
+ 		keybits = BN_num_bits(key->rsa->n);
+ 		if (keybits < 0 || bits != (u_int)keybits)
+-			logit("Warning: identity keysize mismatch: actual %d, announced %u",
++			pam_ssh_log(LOG_INFO/*logit*/, "Warning: identity keysize mismatch: actual %d, announced %u",
+ 			    BN_num_bits(key->rsa->n), bits);
+ 		break;
+ 	case 2:
+@@ -388,7 +388,7 @@
+ 	if (key->type != KEY_RSA1)
+ 		return 0;
+ 	if (response_type == 0) {
+-		logit("Compatibility with ssh protocol version 1.0 no longer supported.");
++		pam_ssh_log(LOG_INFO/*logit*/, "Compatibility with ssh protocol version 1.0 no longer supported.");
+ 		return 0;
+ 	}
+ 	buffer_init(&buffer);
+@@ -407,9 +407,9 @@
+ 	type = buffer_get_char(&buffer);
+ 
+ 	if (agent_failed(type)) {
+-		logit("Agent admitted failure to authenticate using the key.");
++		pam_ssh_log(LOG_INFO/*logit*/, "Agent admitted failure to authenticate using the key.");
+ 	} else if (type != SSH_AGENT_RSA_RESPONSE) {
+-		fatal("Bad authentication response: %d", type);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: Bad authentication response: %d", type);
+ 	} else {
+ 		success = 1;
+ 		/*
+@@ -458,9 +458,9 @@
+ 	}
+ 	type = buffer_get_char(&msg);
+ 	if (agent_failed(type)) {
+-		logit("Agent admitted failure to sign using the key.");
++		pam_ssh_log(LOG_INFO/*logit*/, "Agent admitted failure to sign using the key.");
+ 	} else if (type != SSH2_AGENT_SIGN_RESPONSE) {
+-		fatal("Bad authentication response: %d", type);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: Bad authentication response: %d", type);
+ 	} else {
+ 		ret = 0;
+ 		*sigp = buffer_get_string(&msg, lenp);
+@@ -502,7 +502,7 @@
+ 	case KEY_RSA_CERT_V00:
+ 	case KEY_RSA_CERT:
+ 		if (key->cert == NULL || buffer_len(&key->cert->certblob) == 0)
+-			fatal("%s: no cert/certblob", __func__);
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: no cert/certblob", __func__);
+ 		buffer_put_string(b, buffer_ptr(&key->cert->certblob),
+ 		    buffer_len(&key->cert->certblob));
+ 		buffer_put_bignum2(b, key->rsa->d);
+@@ -520,7 +520,7 @@
+ 	case KEY_DSA_CERT_V00:
+ 	case KEY_DSA_CERT:
+ 		if (key->cert == NULL || buffer_len(&key->cert->certblob) == 0)
+-			fatal("%s: no cert/certblob", __func__);
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: no cert/certblob", __func__);
+ 		buffer_put_string(b, buffer_ptr(&key->cert->certblob),
+ 		    buffer_len(&key->cert->certblob));
+ 		buffer_put_bignum2(b, key->dsa->priv_key);
+@@ -534,7 +534,7 @@
+ 		break;
+ 	case KEY_ECDSA_CERT:
+ 		if (key->cert == NULL || buffer_len(&key->cert->certblob) == 0)
+-			fatal("%s: no cert/certblob", __func__);
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: no cert/certblob", __func__);
+ 		buffer_put_string(b, buffer_ptr(&key->cert->certblob),
+ 		    buffer_len(&key->cert->certblob));
+ 		buffer_put_bignum2(b, EC_KEY_get0_private_key(key->ecdsa));
+@@ -717,12 +717,12 @@
+ 	case SSH_AGENT_FAILURE:
+ 	case SSH_COM_AGENT2_FAILURE:
+ 	case SSH2_AGENT_FAILURE:
+-		logit("SSH_AGENT_FAILURE");
++		pam_ssh_log(LOG_INFO/*logit*/, "SSH_AGENT_FAILURE");
+ 		return 0;
+ 	case SSH_AGENT_SUCCESS:
+ 		return 1;
+ 	default:
+-		fatal("Bad response from authentication agent: %d", type);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: Bad response from authentication agent: %d", type);
+ 	}
+ 	/* NOTREACHED */
+ 	return 0;
+--- a/authfile.c
++++ b/authfile.c
+@@ -63,7 +63,7 @@
+ #include "buffer.h"
+ #include "key.h"
+ #include "ssh.h"
+-#include "log.h"
++#include "pam_ssh_log.h"
+ #include "authfile.h"
+ #include "rsa.h"
+ ////#include "misc.h"
+@@ -101,7 +101,7 @@
+ 	cipher_num = (strcmp(passphrase, "") == 0) ?
+ 	    SSH_CIPHER_NONE : SSH_AUTHFILE_CIPHER;
+ 	if ((cipher = cipher_by_number(cipher_num)) == NULL)
+-		fatal("save_private_key_rsa: bad cipher");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: save_private_key_rsa: bad cipher");
+ 
+ 	/* This buffer is used to built the secret part of the private key. */
+ 	buffer_init(&buffer);
+@@ -183,11 +183,11 @@
+ 	BIO *bio;
+ 
+ 	if (len > 0 && len <= 4) {
+-		error("passphrase too short: have %d bytes, need > 4", len);
++		pam_ssh_log(LOG_ERR/*error*/, "error: passphrase too short: have %d bytes, need > 4", len);
+ 		return 0;
+ 	}
+ 	if ((bio = BIO_new(BIO_s_mem())) == NULL) {
+-		error("%s: BIO_new failed", __func__);
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: BIO_new failed", __func__);
+ 		return 0;
+ 	}
+ 	switch (key->type) {
+@@ -223,12 +223,12 @@
+ 	int fd;
+ 
+ 	if ((fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0600)) < 0) {
+-		error("open %s failed: %s.", filename, strerror(errno));
++		pam_ssh_log(LOG_ERR/*error*/, "error: open %s failed: %s.", filename, strerror(errno));
+ 		return 0;
+ 	}
+ 	if (atomicio(vwrite, fd, buffer_ptr(keybuf),
+ 	    buffer_len(keybuf)) != buffer_len(keybuf)) {
+-		error("write to key file %s failed: %s", filename,
++		pam_ssh_log(LOG_ERR/*error*/, "error: write to key file %s failed: %s", filename,
+ 		    strerror(errno));
+ 		close(fd);
+ 		unlink(filename);
+@@ -251,7 +251,7 @@
+ 	case KEY_RSA:
+ 		return key_private_pem_to_blob(key, blob, passphrase, comment);
+ 	default:
+-		error("%s: cannot save key type %d", __func__, key->type);
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: cannot save key type %d", __func__, key->type);
+ 		return 0;
+ 	}
+ }
+@@ -286,7 +286,7 @@
+ 
+ 	/* Check that it is at least big enough to contain the ID string. */
+ 	if (buffer_len(blob) < sizeof(authfile_id_string)) {
+-		debug3("Truncated RSA1 identifier");
++		pam_ssh_log(LOG_DEBUG/*debug3*/, "debug: Truncated RSA1 identifier");
+ 		return NULL;
+ 	}
+ 
+@@ -296,7 +296,7 @@
+ 	 */
+ 	if (memcmp(buffer_ptr(blob), authfile_id_string,
+ 	    sizeof(authfile_id_string)) != 0) {
+-		debug3("Incorrect RSA1 identifier");
++		pam_ssh_log(LOG_DEBUG/*debug3*/, "debug: Incorrect RSA1 identifier");
+ 		return NULL;
+ 	}
+ 	buffer_init(&copy);
+@@ -330,7 +330,7 @@
+ 	struct stat st;
+ 
+ 	if (fstat(fd, &st) < 0) {
+-		error("%s: fstat of key file %.200s%sfailed: %.100s", __func__,
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: fstat of key file %.200s%sfailed: %.100s", __func__,
+ 		    filename == NULL ? "" : filename,
+ 		    filename == NULL ? "" : " ",
+ 		    strerror(errno));
+@@ -339,7 +339,7 @@
+ 	if ((st.st_mode & (S_IFSOCK|S_IFCHR|S_IFIFO)) == 0 &&
+ 	    st.st_size > MAX_KEY_FILE_SIZE) {
+  toobig:
+-		error("%s: key file %.200s%stoo large", __func__,
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: key file %.200s%stoo large", __func__,
+ 		    filename == NULL ? "" : filename,
+ 		    filename == NULL ? "" : " ");
+ 		return 0;
+@@ -349,7 +349,7 @@
+ 		if ((len = atomicio(read, fd, buf, sizeof(buf))) == 0) {
+ 			if (errno == EPIPE)
+ 				break;
+-			debug("%s: read from key file %.200s%sfailed: %.100s",
++			pam_ssh_log(LOG_DEBUG/*debug*/, "debug: %s: read from key file %.200s%sfailed: %.100s",
+ 			    __func__, filename == NULL ? "" : filename,
+ 			    filename == NULL ? "" : " ", strerror(errno));
+ 			buffer_clear(blob);
+@@ -366,7 +366,7 @@
+ 	bzero(buf, sizeof(buf));
+ 	if ((st.st_mode & (S_IFSOCK|S_IFCHR|S_IFIFO)) == 0 &&
+ 	    st.st_size != buffer_len(blob)) {
+-		debug("%s: key file %.200s%schanged size while reading",
++		pam_ssh_log(LOG_DEBUG/*debug*/, "debug: %s: key file %.200s%schanged size while reading",
+ 		    __func__, filename == NULL ? "" : filename,
+ 		    filename == NULL ? "" : " ");
+ 		buffer_clear(blob);
+@@ -397,7 +397,7 @@
+ 
+ 	pub = key_parse_public_rsa1(&buffer, commentp);
+ 	if (pub == NULL)
+-		debug3("Could not load \"%s\" as a RSA1 public key", filename);
++		pam_ssh_log(LOG_DEBUG/*debug3*/, "debug: Could not load \"%s\" as a RSA1 public key", filename);
+ 	buffer_free(&buffer);
+ 	return pub;
+ }
+@@ -434,7 +434,7 @@
+ 
+ 	/* Check that it is at least big enough to contain the ID string. */
+ 	if (buffer_len(blob) < sizeof(authfile_id_string)) {
+-		debug3("Truncated RSA1 identifier");
++		pam_ssh_log(LOG_DEBUG/*debug3*/, "debug: Truncated RSA1 identifier");
+ 		return NULL;
+ 	}
+ 
+@@ -444,7 +444,7 @@
+ 	 */
+ 	if (memcmp(buffer_ptr(blob), authfile_id_string,
+ 	    sizeof(authfile_id_string)) != 0) {
+-		debug3("Incorrect RSA1 identifier");
++		pam_ssh_log(LOG_DEBUG/*debug3*/, "debug: Incorrect RSA1 identifier");
+ 		return NULL;
+ 	}
+ 	buffer_init(&copy);
+@@ -469,7 +469,7 @@
+ 	/* Check that it is a supported cipher. */
+ 	cipher = cipher_by_number(cipher_type);
+ 	if (cipher == NULL) {
+-		debug("Unsupported RSA1 cipher %d", cipher_type);
++		pam_ssh_log(LOG_DEBUG/*debug*/, "debug: Unsupported RSA1 cipher %d", cipher_type);
+ 		buffer_free(&copy);
+ 		goto fail;
+ 	}
+@@ -491,7 +491,7 @@
+ 	if (check1 != buffer_get_char(&decrypted) ||
+ 	    check2 != buffer_get_char(&decrypted)) {
+ 		if (strcmp(passphrase, "") != 0)
+-			debug("Bad passphrase supplied for RSA1 key");
++			pam_ssh_log(LOG_DEBUG/*debug*/, "debug: Bad passphrase supplied for RSA1 key");
+ 		/* Bad passphrase. */
+ 		buffer_free(&decrypted);
+ 		goto fail;
+@@ -510,7 +510,7 @@
+ 
+ 	/* enable blinding */
+ 	if (RSA_blinding_on(prv->rsa, NULL) != 1) {
+-		error("%s: RSA_blinding_on failed", __func__);
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: RSA_blinding_on failed", __func__);
+ 		goto fail;
+ 	}
+ 	return prv;
+@@ -533,14 +533,14 @@
+ 
+ 	if ((bio = BIO_new_mem_buf(buffer_ptr(blob),
+ 	    buffer_len(blob))) == NULL) {
+-		error("%s: BIO_new_mem_buf failed", __func__);
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: BIO_new_mem_buf failed", __func__);
+ 		return NULL;
+ 	}
+ 
+ 	pk = PEM_read_bio_PrivateKey(bio, NULL, NULL, (char *)passphrase);
+ 	BIO_free(bio);
+ 	if (pk == NULL) {
+-		debug("%s: PEM_read_PrivateKey failed", __func__);
++		pam_ssh_log(LOG_DEBUG/*debug*/, "debug: %s: PEM_read_PrivateKey failed", __func__);
+ 		(void)ERR_get_error();
+ 	} else if (pk->type == EVP_PKEY_RSA &&
+ 	    (type == KEY_UNSPEC||type==KEY_RSA)) {
+@@ -552,7 +552,7 @@
+ 		RSA_print_fp(stderr, prv->rsa, 8);
+ #endif
+ 		if (RSA_blinding_on(prv->rsa, NULL) != 1) {
+-			error("%s: RSA_blinding_on failed", __func__);
++			pam_ssh_log(LOG_ERR/*error*/, "error: %s: RSA_blinding_on failed", __func__);
+ 			key_free(prv);
+ 			prv = NULL;
+ 		}
+@@ -576,7 +576,7 @@
+ 		    key_ec_validate_public(EC_KEY_get0_group(prv->ecdsa),
+ 		    EC_KEY_get0_public_key(prv->ecdsa)) != 0 ||
+ 		    key_ec_validate_private(prv->ecdsa) != 0) {
+-			error("%s: bad ECDSA key", __func__);
++			pam_ssh_log(LOG_ERR/*error*/, "error: %s: bad ECDSA key", __func__);
+ 			key_free(prv);
+ 			prv = NULL;
+ 		}
+@@ -587,14 +587,14 @@
+ #endif
+ #endif /* OPENSSL_HAS_ECC */
+ 	} else {
+-		error("%s: PEM_read_PrivateKey: mismatch or "
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: PEM_read_PrivateKey: mismatch or "
+ 		    "unknown EVP_PKEY save_type %d", __func__, pk->save_type);
+ 	}
+ 	if (pk != NULL)
+ 		EVP_PKEY_free(pk);
+ 	if (prv != NULL && commentp)
+ 		*commentp = xstrdup(name);
+-	debug("read PEM private key done: type %s",
++	pam_ssh_log(LOG_DEBUG/*debug*/, "debug: read PEM private key done: type %s",
+ 	    prv ? key_type(prv) : "<unknown>");
+ 	return prv;
+ }
+@@ -635,13 +635,13 @@
+ 	if (check_ntsec(filename))
+ #endif
+ 	if ((st.st_uid == getuid()) && (st.st_mode & 077) != 0) {
+-		error("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+-		error("@         WARNING: UNPROTECTED PRIVATE KEY FILE!          @");
+-		error("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+-		error("Permissions 0%3.3o for '%s' are too open.",
++		pam_ssh_log(LOG_ERR/*error*/, "error: @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
++		pam_ssh_log(LOG_ERR/*error*/, "error: @         WARNING: UNPROTECTED PRIVATE KEY FILE!          @");
++		pam_ssh_log(LOG_ERR/*error*/, "error: @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
++		pam_ssh_log(LOG_ERR/*error*/, "error: Permissions 0%3.3o for '%s' are too open.",
+ 		    (u_int)st.st_mode & 0777, filename);
+-		error("It is required that your private key files are NOT accessible by others.");
+-		error("This private key will be ignored.");
++		pam_ssh_log(LOG_ERR/*error*/, "error: It is required that your private key files are NOT accessible by others.");
++		pam_ssh_log(LOG_ERR/*error*/, "error: This private key will be ignored.");
+ 		return 0;
+ 	}
+ 	return 1;
+@@ -661,7 +661,7 @@
+ 	case KEY_UNSPEC:
+ 		return key_parse_private_pem(blob, type, passphrase, commentp);
+ 	default:
+-		error("%s: cannot parse key type %d", __func__, type);
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: cannot parse key type %d", __func__, type);
+ 		break;
+ 	}
+ 	return NULL;
+@@ -678,7 +678,7 @@
+ 
+ 	fd = open(filename, O_RDONLY);
+ 	if (fd < 0) {
+-		debug("could not open key file '%s': %s", filename,
++		pam_ssh_log(LOG_DEBUG/*debug*/, "debug: could not open key file '%s': %s", filename,
+ 		    strerror(errno));
+ 		if (perm_ok != NULL)
+ 			*perm_ok = 0;
+@@ -687,7 +687,7 @@
+ 	if (!key_perm_ok(fd, filename)) {
+ 		if (perm_ok != NULL)
+ 			*perm_ok = 0;
+-		error("bad permissions: ignore key: %s", filename);
++		pam_ssh_log(LOG_ERR/*error*/, "error: bad permissions: ignore key: %s", filename);
+ 		close(fd);
+ 		return NULL;
+ 	}
+@@ -740,12 +740,12 @@
+ 
+ 	fd = open(filename, O_RDONLY);
+ 	if (fd < 0) {
+-		debug("could not open key file '%s': %s", filename,
++		pam_ssh_log(LOG_DEBUG/*debug*/, "debug: could not open key file '%s': %s", filename,
+ 		    strerror(errno));
+ 		return NULL;
+ 	}
+ 	if (!key_perm_ok(fd, filename)) {
+-		error("bad permissions: ignore key: %s", filename);
++		pam_ssh_log(LOG_ERR/*error*/, "error: bad permissions: ignore key: %s", filename);
+ 		close(fd);
+ 		return NULL;
+ 	}
+@@ -867,7 +867,7 @@
+ 	case KEY_ECDSA:
+ 		break;
+ 	default:
+-		error("%s: unsupported key type", __func__);
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: unsupported key type", __func__);
+ 		return NULL;
+ 	}
+ 
+@@ -882,10 +882,10 @@
+ 
+ 	/* Make sure the private key matches the certificate */
+ 	if (key_equal_public(key, pub) == 0) {
+-		error("%s: certificate does not match private key %s",
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: certificate does not match private key %s",
+ 		    __func__, filename);
+ 	} else if (key_to_certified(key, key_cert_is_legacy(pub)) != 0) {
+-		error("%s: key_to_certified failed", __func__);
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: key_to_certified failed", __func__);
+ 	} else {
+ 		key_cert_copy(pub, key);
+ 		key_free(pub);
+@@ -917,10 +917,10 @@
+ 
+ 	if ((f = fopen(filename, "r")) == NULL) {
+ 		if (errno == ENOENT) {
+-			debug("%s: keyfile \"%s\" missing", __func__, filename);
++			pam_ssh_log(LOG_DEBUG/*debug*/, "debug: %s: keyfile \"%s\" missing", __func__, filename);
+ 			return 0;
+ 		} else {
+-			error("%s: could not open keyfile \"%s\": %s", __func__,
++			pam_ssh_log(LOG_ERR/*error*/, "error: %s: could not open keyfile \"%s\": %s", __func__,
+ 			    filename, strerror(errno));
+ 			return -1;
+ 		}
+--- a/bufaux.c
++++ b/bufaux.c
+@@ -48,7 +48,7 @@
+ 
+ #include "xmalloc.h"
+ #include "buffer.h"
+-#include "log.h"
++#include "pam_ssh_log.h"
+ #include "misc.h"
+ 
+ /*
+@@ -72,7 +72,7 @@
+ 	u_short ret;
+ 
+ 	if (buffer_get_short_ret(&ret, buffer) == -1)
+-		fatal("buffer_get_short: buffer error");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: buffer_get_short: buffer error");
+ 
+ 	return (ret);
+ }
+@@ -96,7 +96,7 @@
+ 	u_int ret;
+ 
+ 	if (buffer_get_int_ret(&ret, buffer) == -1)
+-		fatal("buffer_get_int: buffer error");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: buffer_get_int: buffer error");
+ 
+ 	return (ret);
+ }
+@@ -120,7 +120,7 @@
+ 	u_int64_t ret;
+ 
+ 	if (buffer_get_int64_ret(&ret, buffer) == -1)
+-		fatal("buffer_get_int: buffer error");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: buffer_get_int: buffer error");
+ 
+ 	return (ret);
+ }
+@@ -176,18 +176,18 @@
+ 
+ 	/* Get the length. */
+ 	if (buffer_get_int_ret(&len, buffer) != 0) {
+-		error("buffer_get_string_ret: cannot extract length");
++		pam_ssh_log(LOG_ERR/*error*/, "error: buffer_get_string_ret: cannot extract length");
+ 		return (NULL);
+ 	}
+ 	if (len > 256 * 1024) {
+-		error("buffer_get_string_ret: bad string length %u", len);
++		pam_ssh_log(LOG_ERR/*error*/, "error: buffer_get_string_ret: bad string length %u", len);
+ 		return (NULL);
+ 	}
+ 	/* Allocate space for the string.  Add one byte for a null character. */
+ 	value = xmalloc(len + 1);
+ 	/* Get the string. */
+ 	if (buffer_get_ret(buffer, value, len) == -1) {
+-		error("buffer_get_string_ret: buffer_get failed");
++		pam_ssh_log(LOG_ERR/*error*/, "error: buffer_get_string_ret: buffer_get failed");
+ 		xfree(value);
+ 		return (NULL);
+ 	}
+@@ -205,7 +205,7 @@
+ 	void *ret;
+ 
+ 	if ((ret = buffer_get_string_ret(buffer, length_ptr)) == NULL)
+-		fatal("buffer_get_string: buffer error");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: buffer_get_string: buffer error");
+ 	return (ret);
+ }
+ 
+@@ -221,7 +221,7 @@
+ 	if ((cp = memchr(ret, '\0', length)) != NULL) {
+ 		/* XXX allow \0 at end-of-string for a while, remove later */
+ 		if (cp == ret + length - 1)
+-			error("buffer_get_cstring_ret: string contains \\0");
++			pam_ssh_log(LOG_ERR/*error*/, "error: buffer_get_cstring_ret: string contains \\0");
+ 		else {
+ 			bzero(ret, length);
+ 			xfree(ret);
+@@ -239,7 +239,7 @@
+ 	char *ret;
+ 
+ 	if ((ret = buffer_get_cstring_ret(buffer, length_ptr)) == NULL)
+-		fatal("buffer_get_cstring: buffer error");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: buffer_get_cstring: buffer error");
+ 	return ret;
+ }
+ #endif	/* not used by pam-ssh */
+@@ -253,7 +253,7 @@
+ 	if (buffer_get_int_ret(&len, buffer) != 0)
+ 		return NULL;
+ 	if (len > 256 * 1024) {
+-		error("buffer_get_string_ptr: bad string length %u", len);
++		pam_ssh_log(LOG_ERR/*error*/, "error: buffer_get_string_ptr: bad string length %u", len);
+ 		return NULL;
+ 	}
+ 	ptr = buffer_ptr(buffer);
+@@ -269,7 +269,7 @@
+ 	void *ret;
+ 
+ 	if ((ret = buffer_get_string_ptr_ret(buffer, length_ptr)) == NULL)
+-		fatal("buffer_get_string_ptr: buffer error");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: buffer_get_string_ptr: buffer error");
+ 	return (ret);
+ }
+ 
+@@ -286,7 +286,7 @@
+ buffer_put_cstring(Buffer *buffer, const char *s)
+ {
+ 	if (s == NULL)
+-		fatal("buffer_put_cstring: s == NULL");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: buffer_put_cstring: s == NULL");
+ 	buffer_put_string(buffer, s, strlen(s));
+ }
+ 
+@@ -297,7 +297,7 @@
+ buffer_get_char_ret(char *ret, Buffer *buffer)
+ {
+ 	if (buffer_get_ret(buffer, ret, 1) == -1) {
+-		error("buffer_get_char_ret: buffer_get_ret failed");
++		pam_ssh_log(LOG_ERR/*error*/, "error: buffer_get_char_ret: buffer_get_ret failed");
+ 		return (-1);
+ 	}
+ 	return (0);
+@@ -309,7 +309,7 @@
+ 	char ch;
+ 
+ 	if (buffer_get_char_ret(&ch, buffer) == -1)
+-		fatal("buffer_get_char: buffer error");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: buffer_get_char: buffer error");
+ 	return (u_char) ch;
+ }
+ 
+--- a/bufbn.c
++++ b/bufbn.c
+@@ -48,7 +48,7 @@
+ 
+ #include "xmalloc.h"
+ #include "buffer.h"
+-#include "log.h"
++#include "pam_ssh_log.h"
+ #include "misc.h"
+ 
+ /*
+@@ -67,7 +67,7 @@
+ 	/* Get the value of in binary */
+ 	oi = BN_bn2bin(value, buf);
+ 	if (oi != bin_size) {
+-		error("buffer_put_bignum_ret: BN_bn2bin() failed: oi %d != bin_size %d",
++		pam_ssh_log(LOG_ERR/*error*/, "error: buffer_put_bignum_ret: BN_bn2bin() failed: oi %d != bin_size %d",
+ 		    oi, bin_size);
+ 		xfree(buf);
+ 		return (-1);
+@@ -89,7 +89,7 @@
+ buffer_put_bignum(Buffer *buffer, const BIGNUM *value)
+ {
+ 	if (buffer_put_bignum_ret(buffer, value) == -1)
+-		fatal("buffer_put_bignum: buffer error");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: buffer_put_bignum: buffer error");
+ }
+ 
+ /*
+@@ -103,27 +103,27 @@
+ 
+ 	/* Get the number of bits. */
+ 	if (buffer_get_ret(buffer, (char *) buf, 2) == -1) {
+-		error("buffer_get_bignum_ret: invalid length");
++		pam_ssh_log(LOG_ERR/*error*/, "error: buffer_get_bignum_ret: invalid length");
+ 		return (-1);
+ 	}
+ 	bits = get_u16(buf);
+ 	/* Compute the number of binary bytes that follow. */
+ 	bytes = (bits + 7) / 8;
+ 	if (bytes > 8 * 1024) {
+-		error("buffer_get_bignum_ret: cannot handle BN of size %d", bytes);
++		pam_ssh_log(LOG_ERR/*error*/, "error: buffer_get_bignum_ret: cannot handle BN of size %d", bytes);
+ 		return (-1);
+ 	}
+ 	if (buffer_len(buffer) < bytes) {
+-		error("buffer_get_bignum_ret: input buffer too small");
++		pam_ssh_log(LOG_ERR/*error*/, "error: buffer_get_bignum_ret: input buffer too small");
+ 		return (-1);
+ 	}
+ 	bin = buffer_ptr(buffer);
+ 	if (BN_bin2bn(bin, bytes, value) == NULL) {
+-		error("buffer_get_bignum_ret: BN_bin2bn failed");
++		pam_ssh_log(LOG_ERR/*error*/, "error: buffer_get_bignum_ret: BN_bin2bn failed");
+ 		return (-1);
+ 	}
+ 	if (buffer_consume_ret(buffer, bytes) == -1) {
+-		error("buffer_get_bignum_ret: buffer_consume failed");
++		pam_ssh_log(LOG_ERR/*error*/, "error: buffer_get_bignum_ret: buffer_consume failed");
+ 		return (-1);
+ 	}
+ 	return (0);
+@@ -133,7 +133,7 @@
+ buffer_get_bignum(Buffer *buffer, BIGNUM *value)
+ {
+ 	if (buffer_get_bignum_ret(buffer, value) == -1)
+-		fatal("buffer_get_bignum: buffer error");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: buffer_get_bignum: buffer error");
+ }
+ 
+ /*
+@@ -152,12 +152,12 @@
+ 		return 0;
+ 	}
+ 	if (value->neg) {
+-		error("buffer_put_bignum2_ret: negative numbers not supported");
++		pam_ssh_log(LOG_ERR/*error*/, "error: buffer_put_bignum2_ret: negative numbers not supported");
+ 		return (-1);
+ 	}
+ 	bytes = BN_num_bytes(value) + 1; /* extra padding byte */
+ 	if (bytes < 2) {
+-		error("buffer_put_bignum2_ret: BN too small");
++		pam_ssh_log(LOG_ERR/*error*/, "error: buffer_put_bignum2_ret: BN too small");
+ 		return (-1);
+ 	}
+ 	buf = xmalloc(bytes);
+@@ -165,7 +165,7 @@
+ 	/* Get the value of in binary */
+ 	oi = BN_bn2bin(value, buf+1);
+ 	if (oi < 0 || (u_int)oi != bytes - 1) {
+-		error("buffer_put_bignum2_ret: BN_bn2bin() failed: "
++		pam_ssh_log(LOG_ERR/*error*/, "error: buffer_put_bignum2_ret: BN_bn2bin() failed: "
+ 		    "oi %d != bin_size %d", oi, bytes);
+ 		xfree(buf);
+ 		return (-1);
+@@ -181,7 +181,7 @@
+ buffer_put_bignum2(Buffer *buffer, const BIGNUM *value)
+ {
+ 	if (buffer_put_bignum2_ret(buffer, value) == -1)
+-		fatal("buffer_put_bignum2: buffer error");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: buffer_put_bignum2: buffer error");
+ }
+ 
+ int
+@@ -191,23 +191,23 @@
+ 	u_char *bin;
+ 
+ 	if ((bin = buffer_get_string_ret(buffer, &len)) == NULL) {
+-		error("buffer_get_bignum2_ret: invalid bignum");
++		pam_ssh_log(LOG_ERR/*error*/, "error: buffer_get_bignum2_ret: invalid bignum");
+ 		return (-1);
+ 	}
+ 
+ 	if (len > 0 && (bin[0] & 0x80)) {
+-		error("buffer_get_bignum2_ret: negative numbers not supported");
++		pam_ssh_log(LOG_ERR/*error*/, "error: buffer_get_bignum2_ret: negative numbers not supported");
+ 		xfree(bin);
+ 		return (-1);
+ 	}
+ 	if (len > 8 * 1024) {
+-		error("buffer_get_bignum2_ret: cannot handle BN of size %d",
++		pam_ssh_log(LOG_ERR/*error*/, "error: buffer_get_bignum2_ret: cannot handle BN of size %d",
+ 		    len);
+ 		xfree(bin);
+ 		return (-1);
+ 	}
+ 	if (BN_bin2bn(bin, len, value) == NULL) {
+-		error("buffer_get_bignum2_ret: BN_bin2bn failed");
++		pam_ssh_log(LOG_ERR/*error*/, "error: buffer_get_bignum2_ret: BN_bin2bn failed");
+ 		xfree(bin);
+ 		return (-1);
+ 	}
+@@ -220,6 +220,6 @@
+ buffer_get_bignum2(Buffer *buffer, BIGNUM *value)
+ {
+ 	if (buffer_get_bignum2_ret(buffer, value) == -1)
+-		fatal("buffer_get_bignum2: buffer error");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: buffer_get_bignum2: buffer error");
+ }
+ #endif	/* not used by pam-ssh */
+--- a/bufec.c
++++ b/bufec.c
+@@ -29,7 +29,7 @@
+ 
+ #include "xmalloc.h"
+ #include "buffer.h"
+-#include "log.h"
++#include "pam_ssh_log.h"
+ #include "misc.h"
+ 
+ /*
+@@ -57,11 +57,11 @@
+ 
+ 	/* Determine length */
+ 	if ((bnctx = BN_CTX_new()) == NULL)
+-		fatal("%s: BN_CTX_new failed", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: BN_CTX_new failed", __func__);
+ 	len = EC_POINT_point2oct(curve, point, POINT_CONVERSION_UNCOMPRESSED,
+ 	    NULL, 0, bnctx);
+ 	if (len > BUFFER_MAX_ECPOINT_LEN) {
+-		error("%s: giant EC point: len = %lu (max %u)",
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: giant EC point: len = %lu (max %u)",
+ 		    __func__, (u_long)len, BUFFER_MAX_ECPOINT_LEN);
+ 		goto out;
+ 	}
+@@ -69,7 +69,7 @@
+ 	buf = xmalloc(len);
+ 	if (EC_POINT_point2oct(curve, point, POINT_CONVERSION_UNCOMPRESSED,
+ 	    buf, len, bnctx) != len) {
+-		error("%s: EC_POINT_point2oct length mismatch", __func__);
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: EC_POINT_point2oct length mismatch", __func__);
+ 		goto out;
+ 	}
+ 	/* Append */
+@@ -89,7 +89,7 @@
+     const EC_POINT *point)
+ {
+ 	if (buffer_put_ecpoint_ret(buffer, curve, point) == -1)
+-		fatal("%s: buffer error", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: buffer error", __func__);
+ }
+ 
+ int
+@@ -102,28 +102,28 @@
+ 	int ret = -1;
+ 
+ 	if ((buf = buffer_get_string_ret(buffer, &len)) == NULL) {
+-		error("%s: invalid point", __func__);
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: invalid point", __func__);
+ 		return -1;
+ 	}
+ 	if ((bnctx = BN_CTX_new()) == NULL)
+-		fatal("%s: BN_CTX_new failed", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: BN_CTX_new failed", __func__);
+ 	if (len > BUFFER_MAX_ECPOINT_LEN) {
+-		error("%s: EC_POINT too long: %u > max %u", __func__,
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: EC_POINT too long: %u > max %u", __func__,
+ 		    len, BUFFER_MAX_ECPOINT_LEN);
+ 		goto out;
+ 	}
+ 	if (len == 0) {
+-		error("%s: EC_POINT buffer is empty", __func__);
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: EC_POINT buffer is empty", __func__);
+ 		goto out;
+ 	}
+ 	if (buf[0] != POINT_CONVERSION_UNCOMPRESSED) {
+-		error("%s: EC_POINT is in an incorrect form: "
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: EC_POINT is in an incorrect form: "
+ 		    "0x%02x (want 0x%02x)", __func__, buf[0],
+ 		    POINT_CONVERSION_UNCOMPRESSED);
+ 		goto out;
+ 	}
+ 	if (EC_POINT_oct2point(curve, point, buf, len, bnctx) != 1) {
+-		error("buffer_get_bignum2_ret: BN_bin2bn failed");
++		pam_ssh_log(LOG_ERR/*error*/, "error: buffer_get_bignum2_ret: BN_bin2bn failed");
+ 		goto out;
+ 	}
+ 	/* EC_POINT_oct2point verifies that the point is on the curve for us */
+@@ -141,7 +141,7 @@
+     EC_POINT *point)
+ {
+ 	if (buffer_get_ecpoint_ret(buffer, curve, point) == -1)
+-		fatal("%s: buffer error", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: buffer error", __func__);
+ }
+ #endif	/* not used by pam-ssh */
+ 
+--- a/buffer.c
++++ b/buffer.c
+@@ -22,7 +22,7 @@
+ 
+ #include "xmalloc.h"
+ #include "buffer.h"
+-#include "log.h"
++#include "pam_ssh_log.h"
+ 
+ #define	BUFFER_MAX_CHUNK	0x100000
+ #define	BUFFER_MAX_LEN		0xa00000
+@@ -106,7 +106,7 @@
+ 	void *p;
+ 
+ 	if (len > BUFFER_MAX_CHUNK)
+-		fatal("buffer_append_space: len %u not supported", len);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: buffer_append_space: len %u not supported", len);
+ 
+ 	/* If the buffer is empty, start using it from the beginning. */
+ 	if (buffer->offset == buffer->end) {
+@@ -128,7 +128,7 @@
+ 	/* Increase the size of the buffer and retry. */
+ 	newlen = roundup(buffer->alloc + len, BUFFER_ALLOCSZ);
+ 	if (newlen > BUFFER_MAX_LEN)
+-		fatal("buffer_append_space: alloc %u not supported",
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: buffer_append_space: alloc %u not supported",
+ 		    newlen);
+ 	buffer->buf = xrealloc(buffer->buf, 1, newlen);
+ 	buffer->alloc = newlen;
+@@ -173,7 +173,7 @@
+ buffer_get_ret(Buffer *buffer, void *buf, u_int len)
+ {
+ 	if (len > buffer->end - buffer->offset) {
+-		error("buffer_get_ret: trying to get more bytes %d than in buffer %d",
++		pam_ssh_log(LOG_ERR/*error*/, "error: buffer_get_ret: trying to get more bytes %d than in buffer %d",
+ 		    len, buffer->end - buffer->offset);
+ 		return (-1);
+ 	}
+@@ -187,7 +187,7 @@
+ buffer_get(Buffer *buffer, void *buf, u_int len)
+ {
+ 	if (buffer_get_ret(buffer, buf, len) == -1)
+-		fatal("buffer_get: buffer error");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: buffer_get: buffer error");
+ }
+ #endif	/* not used by pam-ssh */
+ 
+@@ -197,7 +197,7 @@
+ buffer_consume_ret(Buffer *buffer, u_int bytes)
+ {
+ 	if (bytes > buffer->end - buffer->offset) {
+-		error("buffer_consume_ret: trying to get more bytes than in buffer");
++		pam_ssh_log(LOG_ERR/*error*/, "error: buffer_consume_ret: trying to get more bytes than in buffer");
+ 		return (-1);
+ 	}
+ 	buffer->offset += bytes;
+@@ -208,7 +208,7 @@
+ buffer_consume(Buffer *buffer, u_int bytes)
+ {
+ 	if (buffer_consume_ret(buffer, bytes) == -1)
+-		fatal("buffer_consume: buffer error");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: buffer_consume: buffer error");
+ }
+ 
+ #if 0	/* not used by pam-ssh */
+@@ -227,7 +227,7 @@
+ buffer_consume_end(Buffer *buffer, u_int bytes)
+ {
+ 	if (buffer_consume_end_ret(buffer, bytes) == -1)
+-		fatal("buffer_consume_end: trying to get more bytes than in buffer");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: buffer_consume_end: trying to get more bytes than in buffer");
+ }
+ #endif	/* not used by pam-ssh */
+ 
+--- a/cipher-3des1.c
++++ b/cipher-3des1.c
+@@ -33,7 +33,7 @@
+ #include <string.h>
+ 
+ #include "xmalloc.h"
+-#include "log.h"
++#include "pam_ssh_log.h"
+ 
+ ////#include "openbsd-compat/openssl-compat.h"
+ #if OPENSSL_VERSION_NUMBER < 0x1000000fL	/* 1.0.0 */
+@@ -113,7 +113,7 @@
+ 	struct ssh1_3des_ctx *c;
+ 
+ 	if ((c = EVP_CIPHER_CTX_get_app_data(ctx)) == NULL) {
+-		error("ssh1_3des_cbc: no context");
++		pam_ssh_log(LOG_ERR/*error*/, "error: ssh1_3des_cbc: no context");
+ 		return (0);
+ 	}
+ #ifdef SSH_OLD_EVP
+@@ -151,16 +151,16 @@
+ 	struct ssh1_3des_ctx *c;
+ 
+ 	if (len != 24)
+-		fatal("%s: bad 3des iv length: %d", __func__, len);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: bad 3des iv length: %d", __func__, len);
+ 	if ((c = EVP_CIPHER_CTX_get_app_data(evp)) == NULL)
+-		fatal("%s: no 3des context", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: no 3des context", __func__);
+ 	if (doset) {
+-		debug3("%s: Installed 3DES IV", __func__);
++		pam_ssh_log(LOG_DEBUG/*debug3*/, "debug: %s: Installed 3DES IV", __func__);
+ 		memcpy(c->k1.iv, iv, 8);
+ 		memcpy(c->k2.iv, iv + 8, 8);
+ 		memcpy(c->k3.iv, iv + 16, 8);
+ 	} else {
+-		debug3("%s: Copying 3DES IV", __func__);
++		pam_ssh_log(LOG_DEBUG/*debug3*/, "debug: %s: Copying 3DES IV", __func__);
+ 		memcpy(iv, c->k1.iv, 8);
+ 		memcpy(iv + 8, c->k2.iv, 8);
+ 		memcpy(iv + 16, c->k3.iv, 8);
+--- a/cipher.c
++++ b/cipher.c
+@@ -45,7 +45,7 @@
+ #include <stdarg.h>
+ 
+ #include "xmalloc.h"
+-#include "log.h"
++#include "pam_ssh_log.h"
+ #include "cipher.h"
+ 
+ /////* compatibility with old or broken OpenSSL versions */
+@@ -176,14 +176,14 @@
+ 	    (p = strsep(&cp, CIPHER_SEP))) {
+ 		c = cipher_by_name(p);
+ 		if (c == NULL || c->number != SSH_CIPHER_SSH2) {
+-			debug("bad cipher %s [%s]", p, names);
++			pam_ssh_log(LOG_DEBUG/*debug*/, "debug: bad cipher %s [%s]", p, names);
+ 			xfree(cipher_list);
+ 			return 0;
+ 		} else {
+-			debug3("cipher ok: %s [%s]", p, names);
++			pam_ssh_log(LOG_DEBUG/*debug3*/, "debug: cipher ok: %s [%s]", p, names);
+ 		}
+ 	}
+-	debug3("ciphers ok: [%s]", names);
++	pam_ssh_log(LOG_DEBUG/*debug3*/, "debug: ciphers ok: [%s]", names);
+ 	xfree(cipher_list);
+ 	return 1;
+ }
+@@ -228,7 +228,7 @@
+ 
+ 	if (cipher->number == SSH_CIPHER_DES) {
+ 		if (dowarn) {
+-			error("Warning: use of DES is strongly discouraged "
++			pam_ssh_log(LOG_ERR/*error*/, "error: Warning: use of DES is strongly discouraged "
+ 			    "due to cryptographic weaknesses");
+ 			dowarn = 0;
+ 		}
+@@ -238,10 +238,10 @@
+ 	cc->plaintext = (cipher->number == SSH_CIPHER_NONE);
+ 
+ 	if (keylen < cipher->key_len)
+-		fatal("cipher_init: key length %d is insufficient for %s.",
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: cipher_init: key length %d is insufficient for %s.",
+ 		    keylen, cipher->name);
+ 	if (iv != NULL && ivlen < cipher->block_size)
+-		fatal("cipher_init: iv length %d is insufficient for %s.",
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: cipher_init: iv length %d is insufficient for %s.",
+ 		    ivlen, cipher->name);
+ 	cc->cipher = cipher;
+ 
+@@ -250,7 +250,7 @@
+ 	EVP_CIPHER_CTX_init(&cc->evp);
+ #ifdef SSH_OLD_EVP
+ 	if (type->key_len > 0 && type->key_len != keylen) {
+-		debug("cipher_init: set keylen (%d -> %d)",
++		pam_ssh_log(LOG_DEBUG/*debug*/, "debug: cipher_init: set keylen (%d -> %d)",
+ 		    type->key_len, keylen);
+ 		type->key_len = keylen;
+ 	}
+@@ -259,17 +259,17 @@
+ #else
+ 	if (EVP_CipherInit(&cc->evp, type, NULL, (u_char *)iv,
+ 	    (do_encrypt == CIPHER_ENCRYPT)) == 0)
+-		fatal("cipher_init: EVP_CipherInit failed for %s",
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: cipher_init: EVP_CipherInit failed for %s",
+ 		    cipher->name);
+ 	klen = EVP_CIPHER_CTX_key_length(&cc->evp);
+ 	if (klen > 0 && keylen != (u_int)klen) {
+-		debug2("cipher_init: set keylen (%d -> %d)", klen, keylen);
++		pam_ssh_log(LOG_DEBUG/*debug2*/, "debug: cipher_init: set keylen (%d -> %d)", klen, keylen);
+ 		if (EVP_CIPHER_CTX_set_key_length(&cc->evp, keylen) == 0)
+-			fatal("cipher_init: set keylen failed (%d -> %d)",
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: cipher_init: set keylen failed (%d -> %d)",
+ 			    klen, keylen);
+ 	}
+ 	if (EVP_CipherInit(&cc->evp, NULL, (u_char *)key, NULL, -1) == 0)
+-		fatal("cipher_init: EVP_CipherInit: set key failed for %s",
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: cipher_init: EVP_CipherInit: set key failed for %s",
+ 		    cipher->name);
+ #endif
+ 
+@@ -278,7 +278,7 @@
+ 		discard = xmalloc(cipher->discard_len);
+ 		if (EVP_Cipher(&cc->evp, discard, junk,
+ 		    cipher->discard_len) == 0)
+-			fatal("evp_crypt: EVP_Cipher failed during discard");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: evp_crypt: EVP_Cipher failed during discard");
+ 		memset(discard, 0, cipher->discard_len);
+ 		xfree(junk);
+ 		xfree(discard);
+@@ -290,16 +290,16 @@
+ cipher_crypt(CipherContext *cc, u_char *dest, const u_char *src, u_int len)
+ {
+ 	if (len % cc->cipher->block_size)
+-		fatal("cipher_encrypt: bad plaintext length %d", len);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: cipher_encrypt: bad plaintext length %d", len);
+ 	if (EVP_Cipher(&cc->evp, dest, (u_char *)src, len) == 0)
+-		fatal("evp_crypt: EVP_Cipher failed");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: evp_crypt: EVP_Cipher failed");
+ }
+ 
+ void
+ cipher_cleanup(CipherContext *cc)
+ {
+ 	if (EVP_CIPHER_CTX_cleanup(&cc->evp) == 0)
+-		error("cipher_cleanup: EVP_CIPHER_CTX_cleanup failed");
++		pam_ssh_log(LOG_ERR/*error*/, "error: cipher_cleanup: EVP_CIPHER_CTX_cleanup failed");
+ }
+ 
+ /*
+@@ -358,7 +358,7 @@
+ 		if (evplen <= 0)
+ 			return;
+ 		if ((u_int)evplen != len)
+-			fatal("%s: wrong iv length %d != %d", __func__,
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: wrong iv length %d != %d", __func__,
+ 			    evplen, len);
+ #ifdef USE_BUILTIN_RIJNDAEL
+ 		if (c->evptype == evp_rijndael)
+@@ -374,7 +374,7 @@
+ 		ssh1_3des_iv(&cc->evp, 0, iv, 24);
+ 		break;
+ 	default:
+-		fatal("%s: bad cipher %d", __func__, c->number);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: bad cipher %d", __func__, c->number);
+ 	}
+ }
+ 
+@@ -405,7 +405,7 @@
+ 		ssh1_3des_iv(&cc->evp, 1, iv, 24);
+ 		break;
+ 	default:
+-		fatal("%s: bad cipher %d", __func__, c->number);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: bad cipher %d", __func__, c->number);
+ 	}
+ }
+ 
+--- a/cipher-ctr.c
++++ b/cipher-ctr.c
+@@ -24,7 +24,7 @@
+ #include <openssl/evp.h>
+ 
+ #include "xmalloc.h"
+-#include "log.h"
++#include "pam_ssh_log.h"
+ 
+ /////* compatibility with old or broken OpenSSL versions */
+ ////#include "openbsd-compat/openssl-compat.h"
+@@ -122,7 +122,7 @@
+ 	struct ssh_aes_ctr_ctx *c;
+ 
+ 	if ((c = EVP_CIPHER_CTX_get_app_data(evp)) == NULL)
+-		fatal("ssh_aes_ctr_iv: no context");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: ssh_aes_ctr_iv: no context");
+ 	if (doset)
+ 		memcpy(c->aes_counter, iv, len);
+ 	else
+--- a/cleanup.c
++++ /dev/null
+@@ -1,32 +0,0 @@
+-/* $OpenBSD: cleanup.c,v 1.5 2006/08/03 03:34:42 deraadt Exp $ */
+-/*
+- * Copyright (c) 2003 Markus Friedl <markus@openbsd.org>
+- *
+- * Permission to use, copy, modify, and distribute this software for any
+- * purpose with or without fee is hereby granted, provided that the above
+- * copyright notice and this permission notice appear in all copies.
+- *
+- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+- */
+-
+-#include "includes.h"
+-
+-#include <sys/types.h>
+-
+-#include <unistd.h>
+-#include <stdarg.h>
+-
+-#include "log.h"
+-
+-/* default implementation */
+-void
+-cleanup_exit(int i)
+-{
+-	_exit(i);
+-}
+--- a/configure.ac
++++ b/configure.ac
+@@ -286,7 +286,7 @@
+ 
+ dnl Checks for library functions.
+ AC_CHECK_FUNCS(memmove memset)
+-AC_REPLACE_FUNCS(strlcpy strnvis)
++AC_REPLACE_FUNCS(strlcpy)
+ AC_CHECK_PAM
+ 
+ AC_CONFIG_FILES([Makefile])
+--- a/fatal.c
++++ /dev/null
+@@ -1,45 +0,0 @@
+-/* $OpenBSD: fatal.c,v 1.7 2006/08/03 03:34:42 deraadt Exp $ */
+-/*
+- * Copyright (c) 2002 Markus Friedl.  All rights reserved.
+- *
+- * Redistribution and use in source and binary forms, with or without
+- * modification, are permitted provided that the following conditions
+- * are met:
+- * 1. Redistributions of source code must retain the above copyright
+- *    notice, this list of conditions and the following disclaimer.
+- * 2. Redistributions in binary form must reproduce the above copyright
+- *    notice, this list of conditions and the following disclaimer in the
+- *    documentation and/or other materials provided with the distribution.
+- *
+- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+- * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+- */
+-
+-#include "includes.h"
+-
+-#include <sys/types.h>
+-
+-#include <stdarg.h>
+-
+-#include "log.h"
+-
+-/* Fatal messages.  This function never returns. */
+-
+-void
+-fatal(const char *fmt,...)
+-{
+-	va_list args;
+-
+-	va_start(args, fmt);
+-	do_log(SYSLOG_LEVEL_FATAL, fmt, args);
+-	va_end(args);
+-	cleanup_exit(255);
+-}
+--- a/key.c
++++ b/key.c
+@@ -51,7 +51,7 @@
+ ////#include "rsa.h"
+ ////#include "uuencode.h"
+ #include "buffer.h"
+-#include "log.h"
++#include "pam_ssh_log.h"
+ ////#include "misc.h"
+ #include "ssh2.h"
+ 
+@@ -89,26 +89,26 @@
+ 	case KEY_RSA_CERT_V00:
+ 	case KEY_RSA_CERT:
+ 		if ((rsa = RSA_new()) == NULL)
+-			fatal("key_new: RSA_new failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_new: RSA_new failed");
+ 		if ((rsa->n = BN_new()) == NULL)
+-			fatal("key_new: BN_new failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_new: BN_new failed");
+ 		if ((rsa->e = BN_new()) == NULL)
+-			fatal("key_new: BN_new failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_new: BN_new failed");
+ 		k->rsa = rsa;
+ 		break;
+ 	case KEY_DSA:
+ 	case KEY_DSA_CERT_V00:
+ 	case KEY_DSA_CERT:
+ 		if ((dsa = DSA_new()) == NULL)
+-			fatal("key_new: DSA_new failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_new: DSA_new failed");
+ 		if ((dsa->p = BN_new()) == NULL)
+-			fatal("key_new: BN_new failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_new: BN_new failed");
+ 		if ((dsa->q = BN_new()) == NULL)
+-			fatal("key_new: BN_new failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_new: BN_new failed");
+ 		if ((dsa->g = BN_new()) == NULL)
+-			fatal("key_new: BN_new failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_new: BN_new failed");
+ 		if ((dsa->pub_key = BN_new()) == NULL)
+-			fatal("key_new: BN_new failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_new: BN_new failed");
+ 		k->dsa = dsa;
+ 		break;
+ #ifdef OPENSSL_HAS_ECC
+@@ -120,7 +120,7 @@
+ 	case KEY_UNSPEC:
+ 		break;
+ 	default:
+-		fatal("key_new: bad key type %d", k->type);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_new: bad key type %d", k->type);
+ 		break;
+ 	}
+ 
+@@ -139,23 +139,23 @@
+ 	case KEY_RSA_CERT_V00:
+ 	case KEY_RSA_CERT:
+ 		if ((k->rsa->d = BN_new()) == NULL)
+-			fatal("key_new_private: BN_new failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_new_private: BN_new failed");
+ 		if ((k->rsa->iqmp = BN_new()) == NULL)
+-			fatal("key_new_private: BN_new failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_new_private: BN_new failed");
+ 		if ((k->rsa->q = BN_new()) == NULL)
+-			fatal("key_new_private: BN_new failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_new_private: BN_new failed");
+ 		if ((k->rsa->p = BN_new()) == NULL)
+-			fatal("key_new_private: BN_new failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_new_private: BN_new failed");
+ 		if ((k->rsa->dmq1 = BN_new()) == NULL)
+-			fatal("key_new_private: BN_new failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_new_private: BN_new failed");
+ 		if ((k->rsa->dmp1 = BN_new()) == NULL)
+-			fatal("key_new_private: BN_new failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_new_private: BN_new failed");
+ 		break;
+ 	case KEY_DSA:
+ 	case KEY_DSA_CERT_V00:
+ 	case KEY_DSA_CERT:
+ 		if ((k->dsa->priv_key = BN_new()) == NULL)
+-			fatal("key_new_private: BN_new failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_new_private: BN_new failed");
+ 		break;
+ 	case KEY_ECDSA:
+ 	case KEY_ECDSA_CERT:
+@@ -199,7 +199,7 @@
+ key_free(Key *k)
+ {
+ 	if (k == NULL)
+-		fatal("key_free: key is NULL");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_free: key is NULL");
+ 	switch (k->type) {
+ 	case KEY_RSA1:
+ 	case KEY_RSA:
+@@ -227,7 +227,7 @@
+ 	case KEY_UNSPEC:
+ 		break;
+ 	default:
+-		fatal("key_free: bad key type %d", k->type);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_free: bad key type %d", k->type);
+ 		break;
+ 	}
+ 	if (key_is_cert(k)) {
+@@ -296,7 +296,7 @@
+ 		    EC_KEY_get0_public_key(b->ecdsa) == NULL)
+ 			return 0;
+ 		if ((bnctx = BN_CTX_new()) == NULL)
+-			fatal("%s: BN_CTX_new failed", __func__);
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: BN_CTX_new failed", __func__);
+ 		if (EC_GROUP_cmp(EC_KEY_get0_group(a->ecdsa),
+ 		    EC_KEY_get0_group(b->ecdsa), bnctx) != 0 ||
+ 		    EC_POINT_cmp(EC_KEY_get0_group(a->ecdsa),
+@@ -309,7 +309,7 @@
+ 		return 1;
+ #endif /* OPENSSL_HAS_ECC */
+ 	default:
+-		fatal("key_equal: bad key type %d", a->type);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_equal: bad key type %d", a->type);
+ 	}
+ 	/* NOTREACHED */
+ }
+@@ -350,7 +350,7 @@
+ 		md = EVP_sha1();
+ 		break;
+ 	default:
+-		fatal("key_fingerprint_raw: bad digest type %d",
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_fingerprint_raw: bad digest type %d",
+ 		    dgst_type);
+ 	}
+ 	switch (k->type) {
+@@ -381,7 +381,7 @@
+ 	case KEY_UNSPEC:
+ 		return retval;
+ 	default:
+-		fatal("key_fingerprint_raw: bad key type %d", k->type);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_fingerprint_raw: bad key type %d", k->type);
+ 		break;
+ 	}
+ 	if (blob != NULL) {
+@@ -392,7 +392,7 @@
+ 		memset(blob, 0, len);
+ 		xfree(blob);
+ 	} else {
+-		fatal("key_fingerprint_raw: blob is null");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_fingerprint_raw: blob is null");
+ 	}
+ 	return retval;
+ }
+@@ -588,7 +588,7 @@
+ 
+ 	dgst_raw = key_fingerprint_raw(k, dgst_type, &dgst_raw_len);
+ 	if (!dgst_raw)
+-		fatal("key_fingerprint: null from key_fingerprint_raw()");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_fingerprint: null from key_fingerprint_raw()");
+ 	switch (dgst_rep) {
+ 	case SSH_FP_HEX:
+ 		retval = key_fingerprint_hex(dgst_raw, dgst_raw_len);
+@@ -600,7 +600,7 @@
+ 		retval = key_fingerprint_randomart(dgst_raw, dgst_raw_len, k);
+ 		break;
+ 	default:
+-		fatal("key_fingerprint: bad digest representation %d",
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_fingerprint: bad digest representation %d",
+ 		    dgst_rep);
+ 		break;
+ 	}
+@@ -662,7 +662,7 @@
+ {
+ 	char *buf = BN_bn2dec(num);
+ 	if (buf == NULL) {
+-		error("write_bignum: BN_bn2dec() failed");
++		pam_ssh_log(LOG_ERR/*error*/, "error: write_bignum: BN_bn2dec() failed");
+ 		return 0;
+ 	}
+ 	fprintf(f, " %s", buf);
+@@ -705,7 +705,7 @@
+ 			return -1;
+ 		/* validate the claimed number of bits */
+ 		if ((u_int)BN_num_bits(ret->rsa->n) != bits) {
+-			verbose("key_read: claimed key size %d does not match "
++			pam_ssh_log(LOG_INFO/*verbose*/, "key_read: claimed key size %d does not match "
+ 			   "actual %d", bits, BN_num_bits(ret->rsa->n));
+ 			return -1;
+ 		}
+@@ -722,7 +722,7 @@
+ 	case KEY_RSA_CERT:
+ 		space = strchr(cp, ' ');
+ 		if (space == NULL) {
+-			debug3("key_read: missing whitespace");
++			pam_ssh_log(LOG_DEBUG/*debug3*/, "debug: key_read: missing whitespace");
+ 			return -1;
+ 		}
+ 		*space = '\0';
+@@ -730,50 +730,50 @@
+ #ifdef OPENSSL_HAS_ECC
+ 		if (key_type_plain(type) == KEY_ECDSA &&
+ 		    (curve_nid = key_ecdsa_nid_from_name(cp)) == -1) {
+-			debug("key_read: invalid curve");
++			pam_ssh_log(LOG_DEBUG/*debug*/, "debug: key_read: invalid curve");
+ 			return -1;
+ 		}
+ #endif
+ 		*space = ' ';
+ 		if (type == KEY_UNSPEC) {
+-			debug3("key_read: missing keytype");
++			pam_ssh_log(LOG_DEBUG/*debug3*/, "debug: key_read: missing keytype");
+ 			return -1;
+ 		}
+ 		cp = space+1;
+ 		if (*cp == '\0') {
+-			debug3("key_read: short string");
++			pam_ssh_log(LOG_DEBUG/*debug3*/, "debug: key_read: short string");
+ 			return -1;
+ 		}
+ 		if (ret->type == KEY_UNSPEC) {
+ 			ret->type = type;
+ 		} else if (ret->type != type) {
+ 			/* is a key, but different type */
+-			debug3("key_read: type mismatch");
++			pam_ssh_log(LOG_DEBUG/*debug3*/, "debug: key_read: type mismatch");
+ 			return -1;
+ 		}
+ 		len = 2*strlen(cp);
+ 		blob = xmalloc(len);
+ 		n = uudecode(cp, blob, len);
+ 		if (n < 0) {
+-			error("key_read: uudecode %s failed", cp);
++			pam_ssh_log(LOG_ERR/*error*/, "error: key_read: uudecode %s failed", cp);
+ 			xfree(blob);
+ 			return -1;
+ 		}
+ 		k = key_from_blob(blob, (u_int)n);
+ 		xfree(blob);
+ 		if (k == NULL) {
+-			error("key_read: key_from_blob %s failed", cp);
++			pam_ssh_log(LOG_ERR/*error*/, "error: key_read: key_from_blob %s failed", cp);
+ 			return -1;
+ 		}
+ 		if (k->type != type) {
+-			error("key_read: type mismatch: encoding error");
++			pam_ssh_log(LOG_ERR/*error*/, "error: key_read: type mismatch: encoding error");
+ 			key_free(k);
+ 			return -1;
+ 		}
+ #ifdef OPENSSL_HAS_ECC
+ 		if (key_type_plain(type) == KEY_ECDSA &&
+ 		    curve_nid != k->ecdsa_nid) {
+-			error("key_read: type mismatch: EC curve mismatch");
++			pam_ssh_log(LOG_ERR/*error*/, "error: key_read: type mismatch: EC curve mismatch");
+ 			key_free(k);
+ 			return -1;
+ 		}
+@@ -781,7 +781,7 @@
+ /*XXXX*/
+ 		if (key_is_cert(ret)) {
+ 			if (!key_is_cert(k)) {
+-				error("key_read: loaded key is not a cert");
++				pam_ssh_log(LOG_ERR/*error*/, "error: key_read: loaded key is not a cert");
+ 				key_free(k);
+ 				return -1;
+ 			}
+@@ -834,7 +834,7 @@
+ 		*cpp = cp;
+ 		break;
+ 	default:
+-		fatal("key_read: bad key type: %d", ret->type);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_read: bad key type: %d", ret->type);
+ 		break;
+ 	}
+ 	return success;
+@@ -852,11 +852,11 @@
+ 
+ 	if (key_is_cert(key)) {
+ 		if (key->cert == NULL) {
+-			error("%s: no cert data", __func__);
++			pam_ssh_log(LOG_ERR/*error*/, "error: %s: no cert data", __func__);
+ 			return 0;
+ 		}
+ 		if (buffer_len(&key->cert->certblob) == 0) {
+-			error("%s: no signed certificate blob", __func__);
++			pam_ssh_log(LOG_ERR/*error*/, "error: %s: no signed certificate blob", __func__);
+ 			return 0;
+ 		}
+ 	}
+@@ -871,7 +871,7 @@
+ 		if (write_bignum(f, key->rsa->e) &&
+ 		    write_bignum(f, key->rsa->n))
+ 			return 1;
+-		error("key_write: failed for RSA key");
++		pam_ssh_log(LOG_ERR/*error*/, "error: key_write: failed for RSA key");
+ 		return 0;
+ 	case KEY_DSA:
+ 	case KEY_DSA_CERT_V00:
+@@ -1044,13 +1044,13 @@
+ 	BIGNUM *f4 = BN_new();
+ 
+ 	if (private == NULL)
+-		fatal("%s: RSA_new failed", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: RSA_new failed", __func__);
+ 	if (f4 == NULL)
+-		fatal("%s: BN_new failed", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: BN_new failed", __func__);
+ 	if (!BN_set_word(f4, RSA_F4))
+-		fatal("%s: BN_new failed", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: BN_new failed", __func__);
+ 	if (!RSA_generate_key_ex(private, bits, f4, NULL))
+-		fatal("%s: key generation failed.", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: key generation failed.", __func__);
+ 	BN_free(f4);
+ 	return private;
+ }
+@@ -1063,12 +1063,12 @@
+ 	DSA *private = DSA_new();
+ 
+ 	if (private == NULL)
+-		fatal("%s: DSA_new failed", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: DSA_new failed", __func__);
+ 	if (!DSA_generate_parameters_ex(private, bits, NULL, 0, NULL,
+ 	    NULL, NULL))
+-		fatal("%s: DSA_generate_parameters failed", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: DSA_generate_parameters failed", __func__);
+ 	if (!DSA_generate_key(private))
+-		fatal("%s: DSA_generate_key failed.", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: DSA_generate_key failed.", __func__);
+ 	return private;
+ }
+ #endif
+@@ -1117,22 +1117,22 @@
+ 	if ((nid = EC_GROUP_get_curve_name(g)) > 0)
+ 		return nid;
+ 	if ((bnctx = BN_CTX_new()) == NULL)
+-		fatal("%s: BN_CTX_new() failed", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: BN_CTX_new() failed", __func__);
+ 	for (i = 0; nids[i] != -1; i++) {
+ 		if ((eg = EC_GROUP_new_by_curve_name(nids[i])) == NULL)
+-			fatal("%s: EC_GROUP_new_by_curve_name failed",
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: EC_GROUP_new_by_curve_name failed",
+ 			    __func__);
+ 		if (EC_GROUP_cmp(g, eg, bnctx) == 0)
+ 			break;
+ 		EC_GROUP_free(eg);
+ 	}
+ 	BN_CTX_free(bnctx);
+-	debug3("%s: nid = %d", __func__, nids[i]);
++	pam_ssh_log(LOG_DEBUG/*debug3*/, "debug: %s: nid = %d", __func__, nids[i]);
+ 	if (nids[i] != -1) {
+ 		/* Use the group with the NID attached */
+ 		EC_GROUP_set_asn1_flag(eg, OPENSSL_EC_NAMED_CURVE);
+ 		if (EC_KEY_set_group(k, eg) != 1)
+-			fatal("%s: EC_KEY_set_group", __func__);
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: EC_KEY_set_group", __func__);
+ 	}
+ 	return nids[i];
+ }
+@@ -1144,11 +1144,11 @@
+ 	EC_KEY *private;
+ 
+ 	if ((*nid = key_ecdsa_bits_to_nid(bits)) == -1)
+-		fatal("%s: invalid key length", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: invalid key length", __func__);
+ 	if ((private = EC_KEY_new_by_curve_name(*nid)) == NULL)
+-		fatal("%s: EC_KEY_new_by_curve_name failed", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: EC_KEY_new_by_curve_name failed", __func__);
+ 	if (EC_KEY_generate_key(private) != 1)
+-		fatal("%s: EC_KEY_generate_key failed", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: EC_KEY_generate_key failed", __func__);
+ 	EC_KEY_set_asn1_flag(private, OPENSSL_EC_NAMED_CURVE);
+ 	return private;
+ }
+@@ -1177,9 +1177,9 @@
+ 	case KEY_DSA_CERT_V00:
+ 	case KEY_RSA_CERT:
+ 	case KEY_DSA_CERT:
+-		fatal("key_generate: cert keys cannot be generated directly");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_generate: cert keys cannot be generated directly");
+ 	default:
+-		fatal("key_generate: unknown type %d", type);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_generate: unknown type %d", type);
+ 	}
+ 	k->type = type;
+ 	return k;
+@@ -1222,7 +1222,7 @@
+ 
+ 	to->nprincipals = from->nprincipals;
+ 	if (to->nprincipals > CERT_MAX_PRINCIPALS)
+-		fatal("%s: nprincipals (%u) > CERT_MAX_PRINCIPALS (%u)",
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: nprincipals (%u) > CERT_MAX_PRINCIPALS (%u)",
+ 		    __func__, to->nprincipals, CERT_MAX_PRINCIPALS);
+ 	if (to->nprincipals > 0) {
+ 		to->principals = xcalloc(from->nprincipals,
+@@ -1247,7 +1247,7 @@
+ 		    (BN_copy(n->dsa->q, k->dsa->q) == NULL) ||
+ 		    (BN_copy(n->dsa->g, k->dsa->g) == NULL) ||
+ 		    (BN_copy(n->dsa->pub_key, k->dsa->pub_key) == NULL))
+-			fatal("key_from_private: BN_copy failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_from_private: BN_copy failed");
+ 		break;
+ #ifdef OPENSSL_HAS_ECC
+ 	case KEY_ECDSA:
+@@ -1255,10 +1255,10 @@
+ 		n = key_new(k->type);
+ 		n->ecdsa_nid = k->ecdsa_nid;
+ 		if ((n->ecdsa = EC_KEY_new_by_curve_name(k->ecdsa_nid)) == NULL)
+-			fatal("%s: EC_KEY_new_by_curve_name failed", __func__);
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: EC_KEY_new_by_curve_name failed", __func__);
+ 		if (EC_KEY_set_public_key(n->ecdsa,
+ 		    EC_KEY_get0_public_key(k->ecdsa)) != 1)
+-			fatal("%s: EC_KEY_set_public_key failed", __func__);
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: EC_KEY_set_public_key failed", __func__);
+ 		break;
+ #endif
+ 	case KEY_RSA:
+@@ -1268,10 +1268,10 @@
+ 		n = key_new(k->type);
+ 		if ((BN_copy(n->rsa->n, k->rsa->n) == NULL) ||
+ 		    (BN_copy(n->rsa->e, k->rsa->e) == NULL))
+-			fatal("key_from_private: BN_copy failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_from_private: BN_copy failed");
+ 		break;
+ 	default:
+-		fatal("key_from_private: unknown type %d", k->type);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_from_private: unknown type %d", k->type);
+ 		break;
+ 	}
+ 	if (key_is_cert(k))
+@@ -1316,7 +1316,7 @@
+ #endif
+ 	}
+ 
+-	debug2("key_type_from_name: unknown key type '%s'", name);
++	pam_ssh_log(LOG_DEBUG/*debug2*/, "debug: key_type_from_name: unknown key type '%s'", name);
+ 	return KEY_UNSPEC;
+ }
+ 
+@@ -1335,7 +1335,7 @@
+ 		return NID_secp521r1;
+ #endif /* OPENSSL_HAS_ECC */
+ 
+-	debug2("%s: unknown/non-ECDSA key type '%s'", __func__, name);
++	pam_ssh_log(LOG_DEBUG/*debug2*/, "debug: %s: unknown/non-ECDSA key type '%s'", __func__, name);
+ 	return -1;
+ }
+ 
+@@ -1356,7 +1356,7 @@
+ 			return 0;
+ 		}
+ 	}
+-	debug3("key names ok: [%s]", names);
++	pam_ssh_log(LOG_DEBUG/*debug3*/, "debug: key names ok: [%s]", names);
+ 	xfree(s);
+ 	return 1;
+ }
+@@ -1391,7 +1391,7 @@
+ 	    (v00 && buffer_get_string_ptr_ret(b, NULL) == NULL) || /* nonce */
+ 	    buffer_get_string_ptr_ret(b, NULL) == NULL || /* reserved */
+ 	    (sig_key = buffer_get_string_ret(b, &sklen)) == NULL) {
+-		error("%s: parse error", __func__);
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: parse error", __func__);
+ 		goto out;
+ 	}
+ 
+@@ -1399,24 +1399,24 @@
+ 	signed_len = buffer_len(&key->cert->certblob) - buffer_len(b);
+ 
+ 	if ((sig = buffer_get_string_ret(b, &slen)) == NULL) {
+-		error("%s: parse error", __func__);
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: parse error", __func__);
+ 		goto out;
+ 	}
+ 
+ 	if (key->cert->type != SSH2_CERT_TYPE_USER &&
+ 	    key->cert->type != SSH2_CERT_TYPE_HOST) {
+-		error("Unknown certificate type %u", key->cert->type);
++		pam_ssh_log(LOG_ERR/*error*/, "error: Unknown certificate type %u", key->cert->type);
+ 		goto out;
+ 	}
+ 
+ 	buffer_append(&tmp, principals, plen);
+ 	while (buffer_len(&tmp) > 0) {
+ 		if (key->cert->nprincipals >= CERT_MAX_PRINCIPALS) {
+-			error("%s: Too many principals", __func__);
++			pam_ssh_log(LOG_ERR/*error*/, "error: %s: Too many principals", __func__);
+ 			goto out;
+ 		}
+ 		if ((principal = buffer_get_cstring_ret(&tmp, &plen)) == NULL) {
+-			error("%s: Principals data invalid", __func__);
++			pam_ssh_log(LOG_ERR/*error*/, "error: %s: Principals data invalid", __func__);
+ 			goto out;
+ 		}
+ 		key->cert->principals = xrealloc(key->cert->principals,
+@@ -1432,7 +1432,7 @@
+ 	while (buffer_len(&tmp) != 0) {
+ 		if (buffer_get_string_ptr_ret(&tmp, NULL) == NULL ||
+ 		    buffer_get_string_ptr_ret(&tmp, NULL) == NULL) {
+-			error("%s: critical option data invalid", __func__);
++			pam_ssh_log(LOG_ERR/*error*/, "error: %s: critical option data invalid", __func__);
+ 			goto out;
+ 		}
+ 	}
+@@ -1444,7 +1444,7 @@
+ 	while (buffer_len(&tmp) != 0) {
+ 		if (buffer_get_string_ptr_ret(&tmp, NULL) == NULL ||
+ 		    buffer_get_string_ptr_ret(&tmp, NULL) == NULL) {
+-			error("%s: extension data invalid", __func__);
++			pam_ssh_log(LOG_ERR/*error*/, "error: %s: extension data invalid", __func__);
+ 			goto out;
+ 		}
+ 	}
+@@ -1452,13 +1452,13 @@
+ 
+ 	if ((key->cert->signature_key = key_from_blob(sig_key,
+ 	    sklen)) == NULL) {
+-		error("%s: Signature key invalid", __func__);
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: Signature key invalid", __func__);
+ 		goto out;
+ 	}
+ 	if (key->cert->signature_key->type != KEY_RSA &&
+ 	    key->cert->signature_key->type != KEY_DSA &&
+ 	    key->cert->signature_key->type != KEY_ECDSA) {
+-		error("%s: Invalid signature key type %s (%d)", __func__,
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: Invalid signature key type %s (%d)", __func__,
+ 		    key_type(key->cert->signature_key),
+ 		    key->cert->signature_key->type);
+ 		goto out;
+@@ -1470,10 +1470,10 @@
+ 		ret = 0;
+ 		break; /* Good signature */
+ 	case 0:
+-		error("%s: Invalid signature on certificate", __func__);
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: Invalid signature on certificate", __func__);
+ 		goto out;
+ 	case -1:
+-		error("%s: Certificate signature verification failed",
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: Certificate signature verification failed",
+ 		    __func__);
+ 		goto out;
+ 	}
+@@ -1513,7 +1513,7 @@
+ 	buffer_init(&b);
+ 	buffer_append(&b, blob, blen);
+ 	if ((ktype = buffer_get_cstring_ret(&b, NULL)) == NULL) {
+-		error("key_from_blob: can't read key type");
++		pam_ssh_log(LOG_ERR/*error*/, "error: key_from_blob: can't read key type");
+ 		goto out;
+ 	}
+ 
+@@ -1532,7 +1532,7 @@
+ 		key = key_new(type);
+ 		if (buffer_get_bignum2_ret(&b, key->rsa->e) == -1 ||
+ 		    buffer_get_bignum2_ret(&b, key->rsa->n) == -1) {
+-			error("key_from_blob: can't read rsa key");
++			pam_ssh_log(LOG_ERR/*error*/, "error: key_from_blob: can't read rsa key");
+  badkey:
+ 			key_free(key);
+ 			key = NULL;
+@@ -1552,7 +1552,7 @@
+ 		    buffer_get_bignum2_ret(&b, key->dsa->q) == -1 ||
+ 		    buffer_get_bignum2_ret(&b, key->dsa->g) == -1 ||
+ 		    buffer_get_bignum2_ret(&b, key->dsa->pub_key) == -1) {
+-			error("key_from_blob: can't read dsa key");
++			pam_ssh_log(LOG_ERR/*error*/, "error: key_from_blob: can't read dsa key");
+ 			goto badkey;
+ 		}
+ #ifdef DEBUG_PK
+@@ -1567,30 +1567,30 @@
+ 		key = key_new(type);
+ 		key->ecdsa_nid = nid;
+ 		if ((curve = buffer_get_string_ret(&b, NULL)) == NULL) {
+-			error("key_from_blob: can't read ecdsa curve");
++			pam_ssh_log(LOG_ERR/*error*/, "error: key_from_blob: can't read ecdsa curve");
+ 			goto badkey;
+ 		}
+ 		if (key->ecdsa_nid != key_curve_name_to_nid(curve)) {
+-			error("key_from_blob: ecdsa curve doesn't match type");
++			pam_ssh_log(LOG_ERR/*error*/, "error: key_from_blob: ecdsa curve doesn't match type");
+ 			goto badkey;
+ 		}
+ 		if (key->ecdsa != NULL)
+ 			EC_KEY_free(key->ecdsa);
+ 		if ((key->ecdsa = EC_KEY_new_by_curve_name(key->ecdsa_nid))
+ 		    == NULL)
+-			fatal("key_from_blob: EC_KEY_new_by_curve_name failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_from_blob: EC_KEY_new_by_curve_name failed");
+ 		if ((q = EC_POINT_new(EC_KEY_get0_group(key->ecdsa))) == NULL)
+-			fatal("key_from_blob: EC_POINT_new failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_from_blob: EC_POINT_new failed");
+ 		if (buffer_get_ecpoint_ret(&b, EC_KEY_get0_group(key->ecdsa),
+ 		    q) == -1) {
+-			error("key_from_blob: can't read ecdsa key point");
++			pam_ssh_log(LOG_ERR/*error*/, "error: key_from_blob: can't read ecdsa key point");
+ 			goto badkey;
+ 		}
+ 		if (key_ec_validate_public(EC_KEY_get0_group(key->ecdsa),
+ 		    q) != 0)
+ 			goto badkey;
+ 		if (EC_KEY_set_public_key(key->ecdsa, q) != 1)
+-			fatal("key_from_blob: EC_KEY_set_public_key failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_from_blob: EC_KEY_set_public_key failed");
+ #ifdef DEBUG_PK
+ 		key_dump_ec_point(EC_KEY_get0_group(key->ecdsa), q);
+ #endif
+@@ -1600,16 +1600,16 @@
+ 		key = key_new(type);
+ 		break;
+ 	default:
+-		error("key_from_blob: cannot handle type %s", ktype);
++		pam_ssh_log(LOG_ERR/*error*/, "error: key_from_blob: cannot handle type %s", ktype);
+ 		goto out;
+ 	}
+ 	if (key_is_cert(key) && cert_parse(&b, key, blob, blen) == -1) {
+-		error("key_from_blob: can't parse cert data");
++		pam_ssh_log(LOG_ERR/*error*/, "error: key_from_blob: can't parse cert data");
+ 		goto badkey;
+ 	}
+ 	rlen = buffer_len(&b);
+ 	if (key != NULL && rlen != 0)
+-		error("key_from_blob: remaining bytes in key blob %d", rlen);
++		pam_ssh_log(LOG_ERR/*error*/, "error: key_from_blob: remaining bytes in key blob %d", rlen);
+  out:
+ 	if (ktype != NULL)
+ 		xfree(ktype);
+@@ -1632,7 +1632,7 @@
+ 	int len;
+ 
+ 	if (key == NULL) {
+-		error("key_to_blob: key == NULL");
++		pam_ssh_log(LOG_ERR/*error*/, "error: key_to_blob: key == NULL");
+ 		return 0;
+ 	}
+ 	buffer_init(&b);
+@@ -1667,7 +1667,7 @@
+ 		buffer_put_bignum2(&b, key->rsa->n);
+ 		break;
+ 	default:
+-		error("key_to_blob: unsupported key type %d", key->type);
++		pam_ssh_log(LOG_ERR/*error*/, "error: key_to_blob: unsupported key type %d", key->type);
+ 		buffer_free(&b);
+ 		return 0;
+ 	}
+@@ -1706,7 +1706,7 @@
+ 	case KEY_RSA:
+ 		return ssh_rsa_sign(key, sigp, lenp, data, datalen);
+ 	default:
+-		error("key_sign: invalid key type %d", key->type);
++		pam_ssh_log(LOG_ERR/*error*/, "error: key_sign: invalid key type %d", key->type);
+ 		return -1;
+ 	}
+ }
+@@ -1741,7 +1741,7 @@
+ 	case KEY_RSA:
+ 		return ssh_rsa_verify(key, signature, signaturelen, data, datalen);
+ 	default:
+-		error("key_verify: invalid key type %d", key->type);
++		pam_ssh_log(LOG_ERR/*error*/, "error: key_verify: invalid key type %d", key->type);
+ 		return -1;
+ 	}
+ }
+@@ -1770,11 +1770,11 @@
+ 	case KEY_RSA1:
+ 	case KEY_RSA:
+ 		if ((pk->rsa = RSA_new()) == NULL)
+-			fatal("key_demote: RSA_new failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_demote: RSA_new failed");
+ 		if ((pk->rsa->e = BN_dup(k->rsa->e)) == NULL)
+-			fatal("key_demote: BN_dup failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_demote: BN_dup failed");
+ 		if ((pk->rsa->n = BN_dup(k->rsa->n)) == NULL)
+-			fatal("key_demote: BN_dup failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_demote: BN_dup failed");
+ 		break;
+ 	case KEY_DSA_CERT_V00:
+ 	case KEY_DSA_CERT:
+@@ -1782,15 +1782,15 @@
+ 		/* FALLTHROUGH */
+ 	case KEY_DSA:
+ 		if ((pk->dsa = DSA_new()) == NULL)
+-			fatal("key_demote: DSA_new failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_demote: DSA_new failed");
+ 		if ((pk->dsa->p = BN_dup(k->dsa->p)) == NULL)
+-			fatal("key_demote: BN_dup failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_demote: BN_dup failed");
+ 		if ((pk->dsa->q = BN_dup(k->dsa->q)) == NULL)
+-			fatal("key_demote: BN_dup failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_demote: BN_dup failed");
+ 		if ((pk->dsa->g = BN_dup(k->dsa->g)) == NULL)
+-			fatal("key_demote: BN_dup failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_demote: BN_dup failed");
+ 		if ((pk->dsa->pub_key = BN_dup(k->dsa->pub_key)) == NULL)
+-			fatal("key_demote: BN_dup failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_demote: BN_dup failed");
+ 		break;
+ #ifdef OPENSSL_HAS_ECC
+ 	case KEY_ECDSA_CERT:
+@@ -1798,14 +1798,14 @@
+ 		/* FALLTHROUGH */
+ 	case KEY_ECDSA:
+ 		if ((pk->ecdsa = EC_KEY_new_by_curve_name(pk->ecdsa_nid)) == NULL)
+-			fatal("key_demote: EC_KEY_new_by_curve_name failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_demote: EC_KEY_new_by_curve_name failed");
+ 		if (EC_KEY_set_public_key(pk->ecdsa,
+ 		    EC_KEY_get0_public_key(k->ecdsa)) != 1)
+-			fatal("key_demote: EC_KEY_set_public_key failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_demote: EC_KEY_set_public_key failed");
+ 		break;
+ #endif
+ 	default:
+-		fatal("key_free: bad key type %d", k->type);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: key_free: bad key type %d", k->type);
+ 		break;
+ 	}
+ 
+@@ -1867,13 +1867,13 @@
+ 		return 0;
+ 	case KEY_ECDSA:
+ 		if (legacy)
+-			fatal("%s: legacy ECDSA certificates are not supported",
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: legacy ECDSA certificates are not supported",
+ 			    __func__);
+ 		k->cert = cert_new();
+ 		k->type = KEY_ECDSA_CERT;
+ 		return 0;
+ 	default:
+-		error("%s: key has incorrect type %s", __func__, key_type(k));
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: key has incorrect type %s", __func__, key_type(k));
+ 		return -1;
+ 	}
+ }
+@@ -1898,7 +1898,7 @@
+ 		k->type = KEY_ECDSA;
+ 		return 0;
+ 	default:
+-		error("%s: key has incorrect type %s", __func__, key_type(k));
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: key has incorrect type %s", __func__, key_type(k));
+ 		return -1;
+ 	}
+ }
+@@ -1916,19 +1916,19 @@
+ 	u_int i, ca_len, sig_len;
+ 
+ 	if (k->cert == NULL) {
+-		error("%s: key lacks cert info", __func__);
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: key lacks cert info", __func__);
+ 		return -1;
+ 	}
+ 
+ 	if (!key_is_cert(k)) {
+-		error("%s: certificate has unknown type %d", __func__,
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: certificate has unknown type %d", __func__,
+ 		    k->cert->type);
+ 		return -1;
+ 	}
+ 
+ 	if (ca->type != KEY_RSA && ca->type != KEY_DSA &&
+ 	    ca->type != KEY_ECDSA) {
+-		error("%s: CA key has unsupported type %s", __func__,
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: CA key has unsupported type %s", __func__,
+ 		    key_type(ca));
+ 		return -1;
+ 	}
+@@ -1966,7 +1966,7 @@
+ 		buffer_put_bignum2(&k->cert->certblob, k->rsa->n);
+ 		break;
+ 	default:
+-		error("%s: key has incorrect type %s", __func__, key_type(k));
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: key has incorrect type %s", __func__, key_type(k));
+ 		buffer_clear(&k->cert->certblob);
+ 		xfree(ca_blob);
+ 		return -1;
+@@ -2009,7 +2009,7 @@
+ 	/* Sign the whole mess */
+ 	if (key_sign(ca, &sig_blob, &sig_len, buffer_ptr(&k->cert->certblob),
+ 	    buffer_len(&k->cert->certblob)) != 0) {
+-		error("%s: signature operation failed", __func__);
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: signature operation failed", __func__);
+ 		buffer_clear(&k->cert->certblob);
+ 		return -1;
+ 	}
+@@ -2040,7 +2040,7 @@
+ 		}
+ 	}
+ 	if (now < 0) {
+-		error("%s: system clock lies before epoch", __func__);
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: system clock lies before epoch", __func__);
+ 		*reason = "Certificate invalid: not yet valid";
+ 		return -1;
+ 	}
+@@ -2099,7 +2099,7 @@
+ 		return NID_secp521r1;
+ #endif
+ 
+-	debug("%s: unsupported EC curve name \"%.100s\"", __func__, name);
++	pam_ssh_log(LOG_DEBUG/*debug*/, "debug: %s: unsupported EC curve name \"%.100s\"", __func__, name);
+ 	return -1;
+ }
+ 
+@@ -2116,7 +2116,7 @@
+ 		return 521;
+ #endif
+ 	default:
+-		error("%s: unsupported EC curve nid %d", __func__, nid);
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: unsupported EC curve nid %d", __func__, nid);
+ 		return 0;
+ 	}
+ }
+@@ -2132,7 +2132,7 @@
+ 	else if (nid == NID_secp521r1)
+ 		return "nistp521";
+ #endif
+-	error("%s: unsupported EC curve nid %d", __func__, nid);
++	pam_ssh_log(LOG_ERR/*error*/, "error: %s: unsupported EC curve nid %d", __func__, nid);
+ 	return NULL;
+ }
+ 
+@@ -2143,7 +2143,7 @@
+ 	int kbits = key_curve_nid_to_bits(nid);
+ 
+ 	if (kbits == 0)
+-		fatal("%s: invalid nid %d", __func__, nid);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: invalid nid %d", __func__, nid);
+ 	/* RFC5656 section 6.2.1 */
+ 	if (kbits <= 256)
+ 		return EVP_sha256();
+@@ -2162,7 +2162,7 @@
+ 	int ret = -1;
+ 
+ 	if ((bnctx = BN_CTX_new()) == NULL)
+-		fatal("%s: BN_CTX_new failed", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: BN_CTX_new failed", __func__);
+ 	BN_CTX_start(bnctx);
+ 
+ 	/*
+@@ -2171,13 +2171,13 @@
+ 	 */
+ 	if (EC_METHOD_get_field_type(EC_GROUP_method_of(group)) !=
+ 	    NID_X9_62_prime_field) {
+-		error("%s: group is not a prime field", __func__);
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: group is not a prime field", __func__);
+ 		goto out;
+ 	}
+ 
+ 	/* Q != infinity */
+ 	if (EC_POINT_is_at_infinity(group, public)) {
+-		error("%s: received degenerate public key (infinity)",
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: received degenerate public key (infinity)",
+ 		    __func__);
+ 		goto out;
+ 	}
+@@ -2186,22 +2186,22 @@
+ 	    (y = BN_CTX_get(bnctx)) == NULL ||
+ 	    (order = BN_CTX_get(bnctx)) == NULL ||
+ 	    (tmp = BN_CTX_get(bnctx)) == NULL)
+-		fatal("%s: BN_CTX_get failed", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: BN_CTX_get failed", __func__);
+ 
+ 	/* log2(x) > log2(order)/2, log2(y) > log2(order)/2 */
+ 	if (EC_GROUP_get_order(group, order, bnctx) != 1)
+-		fatal("%s: EC_GROUP_get_order failed", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: EC_GROUP_get_order failed", __func__);
+ 	if (EC_POINT_get_affine_coordinates_GFp(group, public,
+ 	    x, y, bnctx) != 1)
+-		fatal("%s: EC_POINT_get_affine_coordinates_GFp", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: EC_POINT_get_affine_coordinates_GFp", __func__);
+ 	if (BN_num_bits(x) <= BN_num_bits(order) / 2) {
+-		error("%s: public key x coordinate too small: "
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: public key x coordinate too small: "
+ 		    "bits(x) = %d, bits(order)/2 = %d", __func__,
+ 		    BN_num_bits(x), BN_num_bits(order) / 2);
+ 		goto out;
+ 	}
+ 	if (BN_num_bits(y) <= BN_num_bits(order) / 2) {
+-		error("%s: public key y coordinate too small: "
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: public key y coordinate too small: "
+ 		    "bits(y) = %d, bits(order)/2 = %d", __func__,
+ 		    BN_num_bits(x), BN_num_bits(order) / 2);
+ 		goto out;
+@@ -2209,25 +2209,25 @@
+ 
+ 	/* nQ == infinity (n == order of subgroup) */
+ 	if ((nq = EC_POINT_new(group)) == NULL)
+-		fatal("%s: BN_CTX_tmp failed", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: BN_CTX_tmp failed", __func__);
+ 	if (EC_POINT_mul(group, nq, NULL, public, order, bnctx) != 1)
+-		fatal("%s: EC_GROUP_mul failed", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: EC_GROUP_mul failed", __func__);
+ 	if (EC_POINT_is_at_infinity(group, nq) != 1) {
+-		error("%s: received degenerate public key (nQ != infinity)",
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: received degenerate public key (nQ != infinity)",
+ 		    __func__);
+ 		goto out;
+ 	}
+ 
+ 	/* x < order - 1, y < order - 1 */
+ 	if (!BN_sub(tmp, order, BN_value_one()))
+-		fatal("%s: BN_sub failed", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: BN_sub failed", __func__);
+ 	if (BN_cmp(x, tmp) >= 0) {
+-		error("%s: public key x coordinate >= group order - 1",
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: public key x coordinate >= group order - 1",
+ 		    __func__);
+ 		goto out;
+ 	}
+ 	if (BN_cmp(y, tmp) >= 0) {
+-		error("%s: public key y coordinate >= group order - 1",
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: public key y coordinate >= group order - 1",
+ 		    __func__);
+ 		goto out;
+ 	}
+@@ -2246,19 +2246,19 @@
+ 	int ret = -1;
+ 
+ 	if ((bnctx = BN_CTX_new()) == NULL)
+-		fatal("%s: BN_CTX_new failed", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: BN_CTX_new failed", __func__);
+ 	BN_CTX_start(bnctx);
+ 
+ 	if ((order = BN_CTX_get(bnctx)) == NULL ||
+ 	    (tmp = BN_CTX_get(bnctx)) == NULL)
+-		fatal("%s: BN_CTX_get failed", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: BN_CTX_get failed", __func__);
+ 
+ 	/* log2(private) > log2(order)/2 */
+ 	if (EC_GROUP_get_order(EC_KEY_get0_group(key), order, bnctx) != 1)
+-		fatal("%s: EC_GROUP_get_order failed", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: EC_GROUP_get_order failed", __func__);
+ 	if (BN_num_bits(EC_KEY_get0_private_key(key)) <=
+ 	    BN_num_bits(order) / 2) {
+-		error("%s: private key too small: "
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: private key too small: "
+ 		    "bits(y) = %d, bits(order)/2 = %d", __func__,
+ 		    BN_num_bits(EC_KEY_get0_private_key(key)),
+ 		    BN_num_bits(order) / 2);
+@@ -2267,9 +2267,9 @@
+ 
+ 	/* private < order - 1 */
+ 	if (!BN_sub(tmp, order, BN_value_one()))
+-		fatal("%s: BN_sub failed", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: BN_sub failed", __func__);
+ 	if (BN_cmp(EC_KEY_get0_private_key(key), tmp) >= 0) {
+-		error("%s: private key >= group order - 1", __func__);
++		pam_ssh_log(LOG_ERR/*error*/, "error: %s: private key >= group order - 1", __func__);
+ 		goto out;
+ 	}
+ 	ret = 0;
+@@ -2290,15 +2290,15 @@
+ 		return;
+ 	}
+ 	if ((bnctx = BN_CTX_new()) == NULL)
+-		fatal("%s: BN_CTX_new failed", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: BN_CTX_new failed", __func__);
+ 	BN_CTX_start(bnctx);
+ 	if ((x = BN_CTX_get(bnctx)) == NULL || (y = BN_CTX_get(bnctx)) == NULL)
+-		fatal("%s: BN_CTX_get failed", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: BN_CTX_get failed", __func__);
+ 	if (EC_METHOD_get_field_type(EC_GROUP_method_of(group)) !=
+ 	    NID_X9_62_prime_field)
+-		fatal("%s: group is not a prime field", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: group is not a prime field", __func__);
+ 	if (EC_POINT_get_affine_coordinates_GFp(group, point, x, y, bnctx) != 1)
+-		fatal("%s: EC_POINT_get_affine_coordinates_GFp", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: EC_POINT_get_affine_coordinates_GFp", __func__);
+ 	fputs("x=", stderr);
+ 	BN_print_fp(stderr, x);
+ 	fputs("\ny=", stderr);
+--- a/log.c
++++ /dev/null
+@@ -1,432 +0,0 @@
+-/* $OpenBSD: log.c,v 1.42 2011/06/17 21:44:30 djm Exp $ */
+-/*
+- * Author: Tatu Ylonen <ylo@cs.hut.fi>
+- * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
+- *                    All rights reserved
+- *
+- * As far as I am concerned, the code I have written for this software
+- * can be used freely for any purpose.  Any derived versions of this
+- * software must be clearly marked as such, and if the derived work is
+- * incompatible with the protocol description in the RFC file, it must be
+- * called by a name other than "ssh" or "Secure Shell".
+- */
+-/*
+- * Copyright (c) 2000 Markus Friedl.  All rights reserved.
+- *
+- * Redistribution and use in source and binary forms, with or without
+- * modification, are permitted provided that the following conditions
+- * are met:
+- * 1. Redistributions of source code must retain the above copyright
+- *    notice, this list of conditions and the following disclaimer.
+- * 2. Redistributions in binary form must reproduce the above copyright
+- *    notice, this list of conditions and the following disclaimer in the
+- *    documentation and/or other materials provided with the distribution.
+- *
+- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+- * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+- */
+-
+-#include "includes.h"
+-
+-#include <sys/types.h>
+-
+-#include <stdarg.h>
+-#include <stdio.h>
+-#include <stdlib.h>
+-#include <string.h>
+-#include <syslog.h>
+-#include <unistd.h>
+-#include <errno.h>
+-#if defined(HAVE_STRNVIS) && defined(HAVE_VIS_H)
+-# include <vis.h>
+-#else
+-# include "strnvis.h"
+-#endif
+-
+-#include "xmalloc.h"
+-#include "log.h"
+-
+-static LogLevel log_level = SYSLOG_LEVEL_INFO;
+-static int log_on_stderr = 1;
+-static int log_facility = LOG_AUTH;
+-static char *argv0;
+-static log_handler_fn *log_handler;
+-static void *log_handler_ctx;
+-
+-extern char *__progname;
+-
+-#define LOG_SYSLOG_VIS	(VIS_CSTYLE|VIS_NL|VIS_TAB|VIS_OCTAL)
+-#define LOG_STDERR_VIS	(VIS_SAFE|VIS_OCTAL)
+-
+-/* textual representation of log-facilities/levels */
+-
+-static struct {
+-	const char *name;
+-	SyslogFacility val;
+-} log_facilities[] = {
+-	{ "DAEMON",	SYSLOG_FACILITY_DAEMON },
+-	{ "USER",	SYSLOG_FACILITY_USER },
+-	{ "AUTH",	SYSLOG_FACILITY_AUTH },
+-#ifdef LOG_AUTHPRIV
+-	{ "AUTHPRIV",	SYSLOG_FACILITY_AUTHPRIV },
+-#endif
+-	{ "LOCAL0",	SYSLOG_FACILITY_LOCAL0 },
+-	{ "LOCAL1",	SYSLOG_FACILITY_LOCAL1 },
+-	{ "LOCAL2",	SYSLOG_FACILITY_LOCAL2 },
+-	{ "LOCAL3",	SYSLOG_FACILITY_LOCAL3 },
+-	{ "LOCAL4",	SYSLOG_FACILITY_LOCAL4 },
+-	{ "LOCAL5",	SYSLOG_FACILITY_LOCAL5 },
+-	{ "LOCAL6",	SYSLOG_FACILITY_LOCAL6 },
+-	{ "LOCAL7",	SYSLOG_FACILITY_LOCAL7 },
+-	{ NULL,		SYSLOG_FACILITY_NOT_SET }
+-};
+-
+-static struct {
+-	const char *name;
+-	LogLevel val;
+-} log_levels[] =
+-{
+-	{ "QUIET",	SYSLOG_LEVEL_QUIET },
+-	{ "FATAL",	SYSLOG_LEVEL_FATAL },
+-	{ "ERROR",	SYSLOG_LEVEL_ERROR },
+-	{ "INFO",	SYSLOG_LEVEL_INFO },
+-	{ "VERBOSE",	SYSLOG_LEVEL_VERBOSE },
+-	{ "DEBUG",	SYSLOG_LEVEL_DEBUG1 },
+-	{ "DEBUG1",	SYSLOG_LEVEL_DEBUG1 },
+-	{ "DEBUG2",	SYSLOG_LEVEL_DEBUG2 },
+-	{ "DEBUG3",	SYSLOG_LEVEL_DEBUG3 },
+-	{ NULL,		SYSLOG_LEVEL_NOT_SET }
+-};
+-
+-SyslogFacility
+-log_facility_number(char *name)
+-{
+-	int i;
+-
+-	if (name != NULL)
+-		for (i = 0; log_facilities[i].name; i++)
+-			if (strcasecmp(log_facilities[i].name, name) == 0)
+-				return log_facilities[i].val;
+-	return SYSLOG_FACILITY_NOT_SET;
+-}
+-
+-const char *
+-log_facility_name(SyslogFacility facility)
+-{
+-	u_int i;
+-
+-	for (i = 0;  log_facilities[i].name; i++)
+-		if (log_facilities[i].val == facility)
+-			return log_facilities[i].name;
+-	return NULL;
+-}
+-
+-LogLevel
+-log_level_number(char *name)
+-{
+-	int i;
+-
+-	if (name != NULL)
+-		for (i = 0; log_levels[i].name; i++)
+-			if (strcasecmp(log_levels[i].name, name) == 0)
+-				return log_levels[i].val;
+-	return SYSLOG_LEVEL_NOT_SET;
+-}
+-
+-const char *
+-log_level_name(LogLevel level)
+-{
+-	u_int i;
+-
+-	for (i = 0; log_levels[i].name != NULL; i++)
+-		if (log_levels[i].val == level)
+-			return log_levels[i].name;
+-	return NULL;
+-}
+-
+-/* Error messages that should be logged. */
+-
+-void
+-error(const char *fmt,...)
+-{
+-	va_list args;
+-
+-	va_start(args, fmt);
+-	do_log(SYSLOG_LEVEL_ERROR, fmt, args);
+-	va_end(args);
+-}
+-
+-void
+-sigdie(const char *fmt,...)
+-{
+-#ifdef DO_LOG_SAFE_IN_SIGHAND
+-	va_list args;
+-
+-	va_start(args, fmt);
+-	do_log(SYSLOG_LEVEL_FATAL, fmt, args);
+-	va_end(args);
+-#endif
+-	_exit(1);
+-}
+-
+-
+-/* Log this message (information that usually should go to the log). */
+-
+-void
+-logit(const char *fmt,...)
+-{
+-	va_list args;
+-
+-	va_start(args, fmt);
+-	do_log(SYSLOG_LEVEL_INFO, fmt, args);
+-	va_end(args);
+-}
+-
+-/* More detailed messages (information that does not need to go to the log). */
+-
+-void
+-verbose(const char *fmt,...)
+-{
+-	va_list args;
+-
+-	va_start(args, fmt);
+-	do_log(SYSLOG_LEVEL_VERBOSE, fmt, args);
+-	va_end(args);
+-}
+-
+-/* Debugging messages that should not be logged during normal operation. */
+-
+-void
+-debug(const char *fmt,...)
+-{
+-	va_list args;
+-
+-	va_start(args, fmt);
+-	do_log(SYSLOG_LEVEL_DEBUG1, fmt, args);
+-	va_end(args);
+-}
+-
+-void
+-debug2(const char *fmt,...)
+-{
+-	va_list args;
+-
+-	va_start(args, fmt);
+-	do_log(SYSLOG_LEVEL_DEBUG2, fmt, args);
+-	va_end(args);
+-}
+-
+-void
+-debug3(const char *fmt,...)
+-{
+-	va_list args;
+-
+-	va_start(args, fmt);
+-	do_log(SYSLOG_LEVEL_DEBUG3, fmt, args);
+-	va_end(args);
+-}
+-
+-/*
+- * Initialize the log.
+- */
+-
+-void
+-log_init(char *av0, LogLevel level, SyslogFacility facility, int on_stderr)
+-{
+-#if defined(HAVE_OPENLOG_R) && defined(SYSLOG_DATA_INIT)
+-	struct syslog_data sdata = SYSLOG_DATA_INIT;
+-#endif
+-
+-	argv0 = av0;
+-
+-	switch (level) {
+-	case SYSLOG_LEVEL_QUIET:
+-	case SYSLOG_LEVEL_FATAL:
+-	case SYSLOG_LEVEL_ERROR:
+-	case SYSLOG_LEVEL_INFO:
+-	case SYSLOG_LEVEL_VERBOSE:
+-	case SYSLOG_LEVEL_DEBUG1:
+-	case SYSLOG_LEVEL_DEBUG2:
+-	case SYSLOG_LEVEL_DEBUG3:
+-		log_level = level;
+-		break;
+-	default:
+-		fprintf(stderr, "Unrecognized internal syslog level code %d\n",
+-		    (int) level);
+-		exit(1);
+-	}
+-
+-	log_handler = NULL;
+-	log_handler_ctx = NULL;
+-
+-	log_on_stderr = on_stderr;
+-	if (on_stderr)
+-		return;
+-
+-	switch (facility) {
+-	case SYSLOG_FACILITY_DAEMON:
+-		log_facility = LOG_DAEMON;
+-		break;
+-	case SYSLOG_FACILITY_USER:
+-		log_facility = LOG_USER;
+-		break;
+-	case SYSLOG_FACILITY_AUTH:
+-		log_facility = LOG_AUTH;
+-		break;
+-#ifdef LOG_AUTHPRIV
+-	case SYSLOG_FACILITY_AUTHPRIV:
+-		log_facility = LOG_AUTHPRIV;
+-		break;
+-#endif
+-	case SYSLOG_FACILITY_LOCAL0:
+-		log_facility = LOG_LOCAL0;
+-		break;
+-	case SYSLOG_FACILITY_LOCAL1:
+-		log_facility = LOG_LOCAL1;
+-		break;
+-	case SYSLOG_FACILITY_LOCAL2:
+-		log_facility = LOG_LOCAL2;
+-		break;
+-	case SYSLOG_FACILITY_LOCAL3:
+-		log_facility = LOG_LOCAL3;
+-		break;
+-	case SYSLOG_FACILITY_LOCAL4:
+-		log_facility = LOG_LOCAL4;
+-		break;
+-	case SYSLOG_FACILITY_LOCAL5:
+-		log_facility = LOG_LOCAL5;
+-		break;
+-	case SYSLOG_FACILITY_LOCAL6:
+-		log_facility = LOG_LOCAL6;
+-		break;
+-	case SYSLOG_FACILITY_LOCAL7:
+-		log_facility = LOG_LOCAL7;
+-		break;
+-	default:
+-		fprintf(stderr,
+-		    "Unrecognized internal syslog facility code %d\n",
+-		    (int) facility);
+-		exit(1);
+-	}
+-
+-	/*
+-	 * If an external library (eg libwrap) attempts to use syslog
+-	 * immediately after reexec, syslog may be pointing to the wrong
+-	 * facility, so we force an open/close of syslog here.
+-	 */
+-#if defined(HAVE_OPENLOG_R) && defined(SYSLOG_DATA_INIT)
+-	openlog_r(argv0 ? argv0 : __progname, LOG_PID, log_facility, &sdata);
+-	closelog_r(&sdata);
+-#else
+-	openlog(argv0 ? argv0 : __progname, LOG_PID, log_facility);
+-	closelog();
+-#endif
+-}
+-
+-#define MSGBUFSIZ 1024
+-
+-void
+-set_log_handler(log_handler_fn *handler, void *ctx)
+-{
+-	log_handler = handler;
+-	log_handler_ctx = ctx;
+-}
+-
+-void
+-do_log2(LogLevel level, const char *fmt,...)
+-{
+-	va_list args;
+-
+-	va_start(args, fmt);
+-	do_log(level, fmt, args);
+-	va_end(args);
+-}
+-
+-void
+-do_log(LogLevel level, const char *fmt, va_list args)
+-{
+-#if defined(HAVE_OPENLOG_R) && defined(SYSLOG_DATA_INIT)
+-	struct syslog_data sdata = SYSLOG_DATA_INIT;
+-#endif
+-	char msgbuf[MSGBUFSIZ];
+-	char fmtbuf[MSGBUFSIZ];
+-	char *txt = NULL;
+-	int pri = LOG_INFO;
+-	int saved_errno = errno;
+-	log_handler_fn *tmp_handler;
+-
+-	if (level > log_level)
+-		return;
+-
+-	switch (level) {
+-	case SYSLOG_LEVEL_FATAL:
+-		if (!log_on_stderr)
+-			txt = "fatal";
+-		pri = LOG_CRIT;
+-		break;
+-	case SYSLOG_LEVEL_ERROR:
+-		if (!log_on_stderr)
+-			txt = "error";
+-		pri = LOG_ERR;
+-		break;
+-	case SYSLOG_LEVEL_INFO:
+-		pri = LOG_INFO;
+-		break;
+-	case SYSLOG_LEVEL_VERBOSE:
+-		pri = LOG_INFO;
+-		break;
+-	case SYSLOG_LEVEL_DEBUG1:
+-		txt = "debug1";
+-		pri = LOG_DEBUG;
+-		break;
+-	case SYSLOG_LEVEL_DEBUG2:
+-		txt = "debug2";
+-		pri = LOG_DEBUG;
+-		break;
+-	case SYSLOG_LEVEL_DEBUG3:
+-		txt = "debug3";
+-		pri = LOG_DEBUG;
+-		break;
+-	default:
+-		txt = "internal error";
+-		pri = LOG_ERR;
+-		break;
+-	}
+-	if (txt != NULL && log_handler == NULL) {
+-		snprintf(fmtbuf, sizeof(fmtbuf), "%s: %s", txt, fmt);
+-		vsnprintf(msgbuf, sizeof(msgbuf), fmtbuf, args);
+-	} else {
+-		vsnprintf(msgbuf, sizeof(msgbuf), fmt, args);
+-	}
+-	strnvis(fmtbuf, msgbuf, sizeof(fmtbuf),
+-	    log_on_stderr ? LOG_STDERR_VIS : LOG_SYSLOG_VIS);
+-	if (log_handler != NULL) {
+-		/* Avoid recursion */
+-		tmp_handler = log_handler;
+-		log_handler = NULL;
+-		tmp_handler(level, fmtbuf, log_handler_ctx);
+-		log_handler = tmp_handler;
+-	} else if (log_on_stderr) {
+-		snprintf(msgbuf, sizeof msgbuf, "%s\r\n", fmtbuf);
+-		write(STDERR_FILENO, msgbuf, strlen(msgbuf));
+-	} else {
+-#if defined(HAVE_OPENLOG_R) && defined(SYSLOG_DATA_INIT)
+-		openlog_r(argv0 ? argv0 : __progname, LOG_PID, log_facility, &sdata);
+-		syslog_r(pri, &sdata, "%.500s", fmtbuf);
+-		closelog_r(&sdata);
+-#else
+-		openlog(argv0 ? argv0 : __progname, LOG_PID, log_facility);
+-		syslog(pri, "%.500s", fmtbuf);
+-		closelog();
+-#endif
+-	}
+-	errno = saved_errno;
+-}
+--- a/log.h
++++ /dev/null
+@@ -1,75 +0,0 @@
+-/* $OpenBSD: log.h,v 1.18 2011/06/17 21:44:30 djm Exp $ */
+-
+-/*
+- * Author: Tatu Ylonen <ylo@cs.hut.fi>
+- * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
+- *                    All rights reserved
+- *
+- * As far as I am concerned, the code I have written for this software
+- * can be used freely for any purpose.  Any derived versions of this
+- * software must be clearly marked as such, and if the derived work is
+- * incompatible with the protocol description in the RFC file, it must be
+- * called by a name other than "ssh" or "Secure Shell".
+- */
+-
+-#ifndef SSH_LOG_H
+-#define SSH_LOG_H
+-
+-/* Supported syslog facilities and levels. */
+-typedef enum {
+-	SYSLOG_FACILITY_DAEMON,
+-	SYSLOG_FACILITY_USER,
+-	SYSLOG_FACILITY_AUTH,
+-#ifdef LOG_AUTHPRIV
+-	SYSLOG_FACILITY_AUTHPRIV,
+-#endif
+-	SYSLOG_FACILITY_LOCAL0,
+-	SYSLOG_FACILITY_LOCAL1,
+-	SYSLOG_FACILITY_LOCAL2,
+-	SYSLOG_FACILITY_LOCAL3,
+-	SYSLOG_FACILITY_LOCAL4,
+-	SYSLOG_FACILITY_LOCAL5,
+-	SYSLOG_FACILITY_LOCAL6,
+-	SYSLOG_FACILITY_LOCAL7,
+-	SYSLOG_FACILITY_NOT_SET = -1
+-}       SyslogFacility;
+-
+-typedef enum {
+-	SYSLOG_LEVEL_QUIET,
+-	SYSLOG_LEVEL_FATAL,
+-	SYSLOG_LEVEL_ERROR,
+-	SYSLOG_LEVEL_INFO,
+-	SYSLOG_LEVEL_VERBOSE,
+-	SYSLOG_LEVEL_DEBUG1,
+-	SYSLOG_LEVEL_DEBUG2,
+-	SYSLOG_LEVEL_DEBUG3,
+-	SYSLOG_LEVEL_NOT_SET = -1
+-}       LogLevel;
+-
+-typedef void (log_handler_fn)(LogLevel, const char *, void *);
+-
+-void     log_init(char *, LogLevel, SyslogFacility, int);
+-
+-SyslogFacility	log_facility_number(char *);
+-const char * 	log_facility_name(SyslogFacility);
+-LogLevel	log_level_number(char *);
+-const char *	log_level_name(LogLevel);
+-
+-void     fatal(const char *, ...) __attribute__((noreturn))
+-    __attribute__((format(printf, 1, 2)));
+-void     error(const char *, ...) __attribute__((format(printf, 1, 2)));
+-void     sigdie(const char *, ...)  __attribute__((noreturn))
+-    __attribute__((format(printf, 1, 2)));
+-void     logit(const char *, ...) __attribute__((format(printf, 1, 2)));
+-void     verbose(const char *, ...) __attribute__((format(printf, 1, 2)));
+-void     debug(const char *, ...) __attribute__((format(printf, 1, 2)));
+-void     debug2(const char *, ...) __attribute__((format(printf, 1, 2)));
+-void     debug3(const char *, ...) __attribute__((format(printf, 1, 2)));
+-
+-
+-void	 set_log_handler(log_handler_fn *, void *);
+-void	 do_log2(LogLevel, const char *, ...)
+-    __attribute__((format(printf, 2, 3)));
+-void	 do_log(LogLevel, const char *, va_list);
+-void	 cleanup_exit(int) __attribute__((noreturn));
+-#endif
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -36,7 +36,7 @@
+ 	cipher.c cipher.h	    \
+ 	acss.c cipher-acss.c acss.h \
+ 	cipher-3des1.c cipher-bf1.c cipher-ctr.c  \
+-	kex.h key.c key.h cleanup.c fatal.c log.c log.h    \
++	kex.h key.c key.h   \
+ 	xmalloc.c xmalloc.h \
+ 	pam_ssh_log.c pam_ssh.c
+ libdir				= @PAMDIR@
+@@ -44,7 +44,7 @@
+ AM_CFLAGS			= -Wall
+ AUTOMAKE_OPTIONS		= dist-bzip2
+ EXTRA_pam_ssh_la_SOURCES	= openpam_cred.h pam_opttab.h pam_option.h \
+-				  pam_get_pass.h strlcpy.h strnvis.h
++				  pam_get_pass.h strlcpy.h
+ EXTRA_DIST			= $(man_MANS) bootstrap.sh pam_ssh.spec \
+ 				  pam_test.c
+ LIBTOOL_DEPS			= @LIBTOOL_DEPS@
+--- a/misc.c
++++ b/misc.c
+@@ -56,7 +56,7 @@
+ 
+ ////#include "xmalloc.h"
+ #include "misc.h"
+-////#include "log.h"
++////#include "pam_ssh_log.h"
+ ////#include "ssh.h"
+ 
+ #if 0
+@@ -85,17 +85,17 @@
+ 
+ 	val = fcntl(fd, F_GETFL, 0);
+ 	if (val < 0) {
+-		error("fcntl(%d, F_GETFL, 0): %s", fd, strerror(errno));
++		pam_ssh_log(LOG_ERR/*error*/, "error: fcntl(%d, F_GETFL, 0): %s", fd, strerror(errno));
+ 		return (-1);
+ 	}
+ 	if (val & O_NONBLOCK) {
+-		debug3("fd %d is O_NONBLOCK", fd);
++		pam_ssh_log(LOG_DEBUG/*debug3*/, "debug: fd %d is O_NONBLOCK", fd);
+ 		return (0);
+ 	}
+-	debug2("fd %d setting O_NONBLOCK", fd);
++	pam_ssh_log(LOG_DEBUG/*debug2*/, "debug: fd %d setting O_NONBLOCK", fd);
+ 	val |= O_NONBLOCK;
+ 	if (fcntl(fd, F_SETFL, val) == -1) {
+-		debug("fcntl(%d, F_SETFL, O_NONBLOCK): %s", fd,
++		pam_ssh_log(LOG_DEBUG/*debug*/, "debug: fcntl(%d, F_SETFL, O_NONBLOCK): %s", fd,
+ 		    strerror(errno));
+ 		return (-1);
+ 	}
+@@ -109,17 +109,17 @@
+ 
+ 	val = fcntl(fd, F_GETFL, 0);
+ 	if (val < 0) {
+-		error("fcntl(%d, F_GETFL, 0): %s", fd, strerror(errno));
++		pam_ssh_log(LOG_ERR/*error*/, "error: fcntl(%d, F_GETFL, 0): %s", fd, strerror(errno));
+ 		return (-1);
+ 	}
+ 	if (!(val & O_NONBLOCK)) {
+-		debug3("fd %d is not O_NONBLOCK", fd);
++		pam_ssh_log(LOG_DEBUG/*debug3*/, "debug: fd %d is not O_NONBLOCK", fd);
+ 		return (0);
+ 	}
+-	debug("fd %d clearing O_NONBLOCK", fd);
++	pam_ssh_log(LOG_DEBUG/*debug*/, "debug: fd %d clearing O_NONBLOCK", fd);
+ 	val &= ~O_NONBLOCK;
+ 	if (fcntl(fd, F_SETFL, val) == -1) {
+-		debug("fcntl(%d, F_SETFL, ~O_NONBLOCK): %s",
++		pam_ssh_log(LOG_DEBUG/*debug*/, "debug: fcntl(%d, F_SETFL, ~O_NONBLOCK): %s",
+ 		    fd, strerror(errno));
+ 		return (-1);
+ 	}
+@@ -143,17 +143,17 @@
+ 
+ 	optlen = sizeof opt;
+ 	if (getsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, &optlen) == -1) {
+-		debug("getsockopt TCP_NODELAY: %.100s", strerror(errno));
++		pam_ssh_log(LOG_DEBUG/*debug*/, "debug: getsockopt TCP_NODELAY: %.100s", strerror(errno));
+ 		return;
+ 	}
+ 	if (opt == 1) {
+-		debug2("fd %d is TCP_NODELAY", fd);
++		pam_ssh_log(LOG_DEBUG/*debug2*/, "debug: fd %d is TCP_NODELAY", fd);
+ 		return;
+ 	}
+ 	opt = 1;
+-	debug2("fd %d setting TCP_NODELAY", fd);
++	pam_ssh_log(LOG_DEBUG/*debug2*/, "debug: fd %d setting TCP_NODELAY", fd);
+ 	if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof opt) == -1)
+-		error("setsockopt TCP_NODELAY: %.100s", strerror(errno));
++		pam_ssh_log(LOG_ERR/*error*/, "error: setsockopt TCP_NODELAY: %.100s", strerror(errno));
+ }
+ 
+ /* Characters considered whitespace in strsep calls. */
+@@ -368,8 +368,8 @@
+ 	if (port == 0 || port == SSH_DEFAULT_PORT)
+ 		return(xstrdup(host));
+ 	if (asprintf(&hoststr, "[%s]:%d", host, (int)port) < 0)
+-		fatal("put_host_port: asprintf: %s", strerror(errno));
+-	debug3("put_host_port: %s", hoststr);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: put_host_port: asprintf: %s", strerror(errno));
++	pam_ssh_log(LOG_DEBUG/*debug3*/, "debug: put_host_port: %s", hoststr);
+ 	return hoststr;
+ }
+ 
+@@ -461,7 +461,7 @@
+ 	r = vasprintf(&cp, fmt, ap);
+ 	va_end(ap);
+ 	if (r == -1)
+-		fatal("addargs: argument too long");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: addargs: argument too long");
+ 
+ 	nalloc = args->nalloc;
+ 	if (args->list == NULL) {
+@@ -487,10 +487,10 @@
+ 	r = vasprintf(&cp, fmt, ap);
+ 	va_end(ap);
+ 	if (r == -1)
+-		fatal("replacearg: argument too long");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: replacearg: argument too long");
+ 
+ 	if (which >= args->num)
+-		fatal("replacearg: tried to replace invalid arg %d >= %d",
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: replacearg: tried to replace invalid arg %d >= %d",
+ 		    which, args->num);
+ 	xfree(args->list[which]);
+ 	args->list[which] = cp;
+@@ -530,28 +530,28 @@
+ 	if (path != NULL && path > filename) {		/* ~user/path */
+ 		slash = path - filename;
+ 		if (slash > sizeof(user) - 1)
+-			fatal("tilde_expand_filename: ~username too long");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: tilde_expand_filename: ~username too long");
+ 		memcpy(user, filename, slash);
+ 		user[slash] = '\0';
+ 		if ((pw = getpwnam(user)) == NULL)
+-			fatal("tilde_expand_filename: No such user %s", user);
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: tilde_expand_filename: No such user %s", user);
+ 	} else if ((pw = getpwuid(uid)) == NULL)	/* ~/path */
+-		fatal("tilde_expand_filename: No such uid %ld", (long)uid);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: tilde_expand_filename: No such uid %ld", (long)uid);
+ 
+ 	if (strlcpy(ret, pw->pw_dir, sizeof(ret)) >= sizeof(ret))
+-		fatal("tilde_expand_filename: Path too long");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: tilde_expand_filename: Path too long");
+ 
+ 	/* Make sure directory has a trailing '/' */
+ 	len = strlen(pw->pw_dir);
+ 	if ((len == 0 || pw->pw_dir[len - 1] != '/') &&
+ 	    strlcat(ret, "/", sizeof(ret)) >= sizeof(ret))
+-		fatal("tilde_expand_filename: Path too long");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: tilde_expand_filename: Path too long");
+ 
+ 	/* Skip leading '/' from specified path */
+ 	if (path != NULL)
+ 		filename = path + 1;
+ 	if (strlcat(ret, filename, sizeof(ret)) >= sizeof(ret))
+-		fatal("tilde_expand_filename: Path too long");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: tilde_expand_filename: Path too long");
+ 
+ 	return (xstrdup(ret));
+ }
+@@ -582,10 +582,10 @@
+ 			break;
+ 		keys[num_keys].repl = va_arg(ap, char *);
+ 		if (keys[num_keys].repl == NULL)
+-			fatal("%s: NULL replacement", __func__);
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: NULL replacement", __func__);
+ 	}
+ 	if (num_keys == EXPAND_MAX_KEYS && va_arg(ap, char *) != NULL)
+-		fatal("%s: too many keys", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: too many keys", __func__);
+ 	va_end(ap);
+ 
+ 	/* Expand string */
+@@ -595,7 +595,7 @@
+  append:
+ 			buf[i++] = *string;
+ 			if (i >= sizeof(buf))
+-				fatal("%s: string too long", __func__);
++				pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: string too long", __func__);
+ 			buf[i] = '\0';
+ 			continue;
+ 		}
+@@ -607,12 +607,12 @@
+ 			if (strchr(keys[j].key, *string) != NULL) {
+ 				i = strlcat(buf, keys[j].repl, sizeof(buf));
+ 				if (i >= sizeof(buf))
+-					fatal("%s: string too long", __func__);
++					pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: string too long", __func__);
+ 				break;
+ 			}
+ 		}
+ 		if (j >= num_keys)
+-			fatal("%s: unknown key %%%c", __func__, *string);
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: unknown key %%%c", __func__, *string);
+ 	}
+ 	return (xstrdup(buf));
+ #undef EXPAND_MAX_KEYS
+@@ -633,7 +633,7 @@
+ 		if (buf[strlen(buf) - 1] == '\n' || feof(f)) {
+ 			return 0;
+ 		} else {
+-			debug("%s: %s line %lu exceeds size limit", __func__,
++			pam_ssh_log(LOG_DEBUG/*debug*/, "debug: %s: %s line %lu exceeds size limit", __func__,
+ 			    filename, *lineno);
+ 			/* discard remainder of line */
+ 			while (fgetc(f) != '\n' && !feof(f))
+@@ -664,16 +664,16 @@
+ 				break;
+ 		}
+ 	} else {
+-		debug("%s: invalid tunnel %u", __func__, tun);
++		pam_ssh_log(LOG_DEBUG/*debug*/, "debug: %s: invalid tunnel %u", __func__, tun);
+ 		return (-1);
+ 	}
+ 
+ 	if (fd < 0) {
+-		debug("%s: %s open failed: %s", __func__, name, strerror(errno));
++		pam_ssh_log(LOG_DEBUG/*debug*/, "debug: %s: %s open failed: %s", __func__, name, strerror(errno));
+ 		return (-1);
+ 	}
+ 
+-	debug("%s: %s mode %d fd %d", __func__, name, mode, fd);
++	pam_ssh_log(LOG_DEBUG/*debug*/, "debug: %s: %s mode %d fd %d", __func__, name, mode, fd);
+ 
+ 	/* Set the tunnel device operation mode */
+ 	snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "tun%d", tun);
+@@ -705,11 +705,11 @@
+ 		close(fd);
+ 	if (sock >= 0)
+ 		close(sock);
+-	debug("%s: failed to set %s mode %d: %s", __func__, name,
++	pam_ssh_log(LOG_DEBUG/*debug*/, "debug: %s: failed to set %s mode %d: %s", __func__, name,
+ 	    mode, strerror(errno));
+ 	return (-1);
+ #else
+-	error("Tunnel interfaces are not supported on this platform");
++	pam_ssh_log(LOG_ERR/*error*/, "error: Tunnel interfaces are not supported on this platform");
+ 	return (-1);
+ #endif
+ }
+@@ -936,7 +936,7 @@
+ 	}
+ 	r = snprintf(s, len, "/tmp/ssh-XXXXXXXXXXXX");
+ 	if (r < 0 || (size_t)r >= len)
+-		fatal("%s: template string too short", __func__);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: %s: template string too short", __func__);
+ }
+ 
+ static const struct {
+@@ -1009,9 +1009,9 @@
+ #ifdef IPV6_V6ONLY
+ 	int on = 1;
+ 
+-	debug3("%s: set socket %d IPV6_V6ONLY", __func__, s);
++	pam_ssh_log(LOG_DEBUG/*debug3*/, "debug: %s: set socket %d IPV6_V6ONLY", __func__, s);
+ 	if (setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &on, sizeof(on)) == -1)
+-		error("setsockopt IPV6_V6ONLY: %s", strerror(errno));
++		pam_ssh_log(LOG_ERR/*error*/, "error: setsockopt IPV6_V6ONLY: %s", strerror(errno));
+ #endif
+ }
+ 
+--- a/rsa.c
++++ b/rsa.c
+@@ -69,7 +69,7 @@
+ 
+ #include "xmalloc.h"
+ #include "rsa.h"
+-#include "log.h"
++#include "pam_ssh_log.h"
+ 
+ void
+ rsa_public_encrypt(BIGNUM *out, BIGNUM *in, RSA *key)
+@@ -78,7 +78,7 @@
+ 	int len, ilen, olen;
+ 
+ 	if (BN_num_bits(key->e) < 2 || !BN_is_odd(key->e))
+-		fatal("rsa_public_encrypt() exponent too small or not odd");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: rsa_public_encrypt() exponent too small or not odd");
+ 
+ 	olen = BN_num_bytes(key->n);
+ 	outbuf = xmalloc(olen);
+@@ -89,10 +89,10 @@
+ 
+ 	if ((len = RSA_public_encrypt(ilen, inbuf, outbuf, key,
+ 	    RSA_PKCS1_PADDING)) <= 0)
+-		fatal("rsa_public_encrypt() failed");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: rsa_public_encrypt() failed");
+ 
+ 	if (BN_bin2bn(outbuf, len, out) == NULL)
+-		fatal("rsa_public_encrypt: BN_bin2bn failed");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: rsa_public_encrypt: BN_bin2bn failed");
+ 
+ 	memset(outbuf, 0, olen);
+ 	memset(inbuf, 0, ilen);
+@@ -115,10 +115,10 @@
+ 
+ 	if ((len = RSA_private_decrypt(ilen, inbuf, outbuf, key,
+ 	    RSA_PKCS1_PADDING)) <= 0) {
+-		error("rsa_private_decrypt() failed");
++		pam_ssh_log(LOG_ERR/*error*/, "error: rsa_private_decrypt() failed");
+ 	} else {
+ 		if (BN_bin2bn(outbuf, len, out) == NULL)
+-			fatal("rsa_private_decrypt: BN_bin2bn failed");
++			pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: rsa_private_decrypt: BN_bin2bn failed");
+ 	}
+ 	memset(outbuf, 0, olen);
+ 	memset(inbuf, 0, ilen);
+@@ -135,15 +135,15 @@
+ 	BN_CTX *ctx;
+ 
+ 	if ((aux = BN_new()) == NULL)
+-		fatal("rsa_generate_additional_parameters: BN_new failed");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: rsa_generate_additional_parameters: BN_new failed");
+ 	if ((ctx = BN_CTX_new()) == NULL)
+-		fatal("rsa_generate_additional_parameters: BN_CTX_new failed");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: rsa_generate_additional_parameters: BN_CTX_new failed");
+ 
+ 	if ((BN_sub(aux, rsa->q, BN_value_one()) == 0) ||
+ 	    (BN_mod(rsa->dmq1, rsa->d, aux, ctx) == 0) ||
+ 	    (BN_sub(aux, rsa->p, BN_value_one()) == 0) ||
+ 	    (BN_mod(rsa->dmp1, rsa->d, aux, ctx) == 0))
+-		fatal("rsa_generate_additional_parameters: BN_sub/mod failed");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: rsa_generate_additional_parameters: BN_sub/mod failed");
+ 
+ 	BN_clear_free(aux);
+ 	BN_CTX_free(ctx);
+--- a/strnvis.c
++++ /dev/null
+@@ -1,187 +0,0 @@
+-/*-
+- * Copyright (c) 1989, 1993
+- *	The Regents of the University of California.  All rights reserved.
+- *
+- * Redistribution and use in source and binary forms, with or without
+- * modification, are permitted provided that the following conditions
+- * are met:
+- * 1. Redistributions of source code must retain the above copyright
+- *    notice, this list of conditions and the following disclaimer.
+- * 2. Redistributions in binary form must reproduce the above copyright
+- *    notice, this list of conditions and the following disclaimer in the
+- *    documentation and/or other materials provided with the distribution.
+- * 3. Neither the name of the University nor the names of its contributors
+- *    may be used to endorse or promote products derived from this software
+- *    without specific prior written permission.
+- *
+- * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+- * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+- * SUCH DAMAGE.
+- *
+- * $Id: strnvis.c,v 1.2 2004/02/20 20:43:03 akorty Exp $
+- */
+-
+-#include <sys/types.h>
+-
+-#include <ctype.h>
+-#include <limits.h>
+-#include <string.h>
+-
+-#include "strnvis.h"
+-
+-#define	isoctal(c)	(((u_char)(c)) >= '0' && ((u_char)(c)) <= '7')
+-#define isvisible(c)	(((u_int)(c) <= UCHAR_MAX && isascii((u_char)(c)) && \
+-				isgraph((u_char)(c))) ||		     \
+-				((flag & VIS_SP) == 0 && (c) == ' ') ||	     \
+-				((flag & VIS_TAB) == 0 && (c) == '\t') ||    \
+-				((flag & VIS_NL) == 0 && (c) == '\n') ||     \
+-				((flag & VIS_SAFE) && ((c) == '\b' ||	     \
+-				(c) == '\007' || (c) == '\r' ||		     \
+-				isgraph((u_char)(c)))))
+-
+-/*
+- * vis - visually encode characters
+- */
+-char *
+-vis(dst, c, flag, nextc)
+-	register char *dst;
+-	int c, nextc;
+-	register int flag;
+-{
+-	if (isvisible(c)) {
+-		*dst++ = c;
+-		if (c == '\\' && (flag & VIS_NOSLASH) == 0)
+-			*dst++ = '\\';
+-		*dst = '\0';
+-		return (dst);
+-	}
+-
+-	if (flag & VIS_CSTYLE) {
+-		switch(c) {
+-		case '\n':
+-			*dst++ = '\\';
+-			*dst++ = 'n';
+-			goto done;
+-		case '\r':
+-			*dst++ = '\\';
+-			*dst++ = 'r';
+-			goto done;
+-		case '\b':
+-			*dst++ = '\\';
+-			*dst++ = 'b';
+-			goto done;
+-		case '\a':
+-			*dst++ = '\\';
+-			*dst++ = 'a';
+-			goto done;
+-		case '\v':
+-			*dst++ = '\\';
+-			*dst++ = 'v';
+-			goto done;
+-		case '\t':
+-			*dst++ = '\\';
+-			*dst++ = 't';
+-			goto done;
+-		case '\f':
+-			*dst++ = '\\';
+-			*dst++ = 'f';
+-			goto done;
+-		case ' ':
+-			*dst++ = '\\';
+-			*dst++ = 's';
+-			goto done;
+-		case '\0':
+-			*dst++ = '\\';
+-			*dst++ = '0';
+-			if (isoctal(nextc)) {
+-				*dst++ = '0';
+-				*dst++ = '0';
+-			}
+-			goto done;
+-		}
+-	}
+-	if (((c & 0177) == ' ') || (flag & VIS_OCTAL)) {	
+-		*dst++ = '\\';
+-		*dst++ = ((u_char)c >> 6 & 07) + '0';
+-		*dst++ = ((u_char)c >> 3 & 07) + '0';
+-		*dst++ = ((u_char)c & 07) + '0';
+-		goto done;
+-	}
+-	if ((flag & VIS_NOSLASH) == 0)
+-		*dst++ = '\\';
+-	if (c & 0200) {
+-		c &= 0177;
+-		*dst++ = 'M';
+-	}
+-	if (iscntrl(c)) {
+-		*dst++ = '^';
+-		if (c == 0177)
+-			*dst++ = '?';
+-		else
+-			*dst++ = c + '@';
+-	} else {
+-		*dst++ = '-';
+-		*dst++ = c;
+-	}
+-done:
+-	*dst = '\0';
+-	return (dst);
+-}
+-
+-int
+-strnvis(dst, src, siz, flag)
+-	char *dst;
+-	const char *src;
+-	size_t siz;
+-	int flag;
+-{
+-	char c;
+-	char *start, *end;
+-	char tbuf[5];
+-	int  i;
+-
+-	i = 0;
+-	for (start = dst, end = start + siz - 1; (c = *src) && dst < end; ) {
+-		if (isvisible(c)) {
+-			i = 1;
+-			*dst++ = c;
+-			if (c == '\\' && (flag & VIS_NOSLASH) == 0) {
+-				/* need space for the extra '\\' */
+-				if (dst < end)
+-					*dst++ = '\\';
+-				else {
+-					dst--;
+-					i = 2;
+-					break;
+-				}
+-			}
+-			src++;
+-		} else {
+-			i = vis(tbuf, c, flag, *++src) - tbuf;
+-			if (dst + i <= end) {
+-				memcpy(dst, tbuf, i);
+-				dst += i;
+-			} else {
+-				src--;
+-				break;
+-			}
+-		}
+-	}
+-	if (siz > 0)
+-		*dst = '\0';
+-	if (dst + i > end) {
+-		/* adjust return value for truncation */
+-		while ((c = *src))
+-			dst += vis(tbuf, c, flag, *++src) - tbuf;
+-	}
+-	return (dst - start);
+-}
+-
+--- a/strnvis.h
++++ /dev/null
+@@ -1,62 +0,0 @@
+-/*-
+- * Copyright (c) 1990 The Regents of the University of California.
+- * All rights reserved.
+- *
+- * Redistribution and use in source and binary forms, with or without
+- * modification, are permitted provided that the following conditions
+- * are met:
+- * 1. Redistributions of source code must retain the above copyright
+- *    notice, this list of conditions and the following disclaimer.
+- * 2. Redistributions in binary form must reproduce the above copyright
+- *    notice, this list of conditions and the following disclaimer in the
+- *    documentation and/or other materials provided with the distribution.
+- * 3. Neither the name of the University nor the names of its contributors
+- *    may be used to endorse or promote products derived from this software
+- *    without specific prior written permission.
+- *
+- * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+- * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+- * SUCH DAMAGE.
+- *
+- * $Id: strnvis.h,v 1.1 2004/02/20 14:55:13 akorty Exp $
+- */
+-
+-#ifndef _VIS_H_
+-#define	_VIS_H_
+-
+-#include <sys/types.h>
+-#include <limits.h>
+-
+-/*
+- * to select alternate encoding format
+- */
+-#define	VIS_OCTAL	0x01	/* use octal \ddd format */
+-#define	VIS_CSTYLE	0x02	/* use \[nrft0..] where appropriate */
+-
+-/*
+- * to alter set of characters encoded (default is to encode all
+- * non-graphic except space, tab, and newline).
+- */
+-#define	VIS_SP		0x04	/* also encode space */
+-#define	VIS_TAB		0x08	/* also encode tab */
+-#define	VIS_NL		0x10	/* also encode newline */
+-#define	VIS_WHITE	(VIS_SP | VIS_TAB | VIS_NL)
+-#define	VIS_SAFE	0x20	/* only encode "unsafe" characters */
+-
+-/*
+- * other
+- */
+-#define	VIS_NOSLASH	0x40	/* inhibit printing '\' */
+-
+-char	*vis(char *, int, int, int);
+-int	strnvis(char *, const char *, size_t, int);
+-
+-#endif /* !_VIS_H_ */
+--- a/xmalloc.c
++++ b/xmalloc.c
+@@ -22,7 +22,7 @@
+ #include <string.h>
+ 
+ #include "xmalloc.h"
+-#include "log.h"
++#include "pam_ssh_log.h"
+ #include "strlcpy.h"
+ 
+ #ifndef SIZE_T_MAX
+@@ -35,10 +35,10 @@
+ 	void *ptr;
+ 
+ 	if (size == 0)
+-		fatal("xmalloc: zero size");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: xmalloc: zero size");
+ 	ptr = malloc(size);
+ 	if (ptr == NULL)
+-		fatal("xmalloc: out of memory (allocating %lu bytes)", (u_long) size);
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: xmalloc: out of memory (allocating %lu bytes)", (u_long) size);
+ 	return ptr;
+ }
+ 
+@@ -48,12 +48,12 @@
+ 	void *ptr;
+ 
+ 	if (size == 0 || nmemb == 0)
+-		fatal("xcalloc: zero size");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: xcalloc: zero size");
+ 	if (SIZE_T_MAX / nmemb < size)
+-		fatal("xcalloc: nmemb * size > SIZE_T_MAX");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: xcalloc: nmemb * size > SIZE_T_MAX");
+ 	ptr = calloc(nmemb, size);
+ 	if (ptr == NULL)
+-		fatal("xcalloc: out of memory (allocating %lu bytes)",
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: xcalloc: out of memory (allocating %lu bytes)",
+ 		    (u_long)(size * nmemb));
+ 	return ptr;
+ }
+@@ -65,15 +65,15 @@
+ 	size_t new_size = nmemb * size;
+ 
+ 	if (new_size == 0)
+-		fatal("xrealloc: zero size");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: xrealloc: zero size");
+ 	if (SIZE_T_MAX / nmemb < size)
+-		fatal("xrealloc: nmemb * size > SIZE_T_MAX");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: xrealloc: nmemb * size > SIZE_T_MAX");
+ 	if (ptr == NULL)
+ 		new_ptr = malloc(new_size);
+ 	else
+ 		new_ptr = realloc(ptr, new_size);
+ 	if (new_ptr == NULL)
+-		fatal("xrealloc: out of memory (new_size %lu bytes)",
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: xrealloc: out of memory (new_size %lu bytes)",
+ 		    (u_long) new_size);
+ 	return new_ptr;
+ }
+@@ -82,7 +82,7 @@
+ xfree(void *ptr)
+ {
+ 	if (ptr == NULL)
+-		fatal("xfree: NULL pointer given as argument");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: xfree: NULL pointer given as argument");
+ 	free(ptr);
+ }
+ 
+@@ -109,7 +109,7 @@
+ 	va_end(ap);
+ 
+ 	if (i < 0 || *ret == NULL)
+-		fatal("xasprintf: could not allocate memory");
++		pam_ssh_log(LOG_ALERT/*fatal*/, "fatal: xasprintf: could not allocate memory");
+ 
+ 	return (i);
+ }
