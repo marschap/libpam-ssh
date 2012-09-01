@@ -1,0 +1,12 @@
+add ecdsa support
+--- a/pam_ssh.c
++++ b/pam_ssh.c
+@@ -507,7 +507,7 @@
+ unlock_standard_keys(pam_handle_t *pamh, const char *pass, const char *dotdir,
+                      int allow_blank)
+ {
+-	char *files[] = {"id_dsa", "id_rsa", "identity", NULL};
++	char *files[] = {"id_ecdsa", "id_dsa", "id_rsa", "identity", NULL};
+ 	int i;
+ 	char *path;
+ 	if (0 == pass) {
