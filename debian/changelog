@@ -1,3 +1,17 @@
+libpam-ssh (1.97-0pm5) unstable; urgency=low
+
+  * debian/patches/update-pam_ssh-manpage.patch: new
+  * debian/NEWS.Debian: updated
+  * debian/changelog: prepare for release
+  * debian/patches/update-embedded_code-openssh.patch: refresh
+  * debian/patches/reduce-debug-logging.diff: ignore
+  * debian/patches/fix-use-pam_ssh_log.patch: new
+  * debian/patches/fix-try-first-password.patch: refresh
+  * debian/patches/debianization.patch: new
+  * debian/patches/add-ecdsa-support.patch: new
+
+ -- Peter Marschall <peter@adpm.de>  Sat, 01 Sep 2012 13:56:49 +0200
+
 libpam-ssh (1.97-0pm4) unstable; urgency=low
 
   * debian/patches/start-ssh-agent.patch: re-introduce
