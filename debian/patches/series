@@ -18,3 +18,4 @@ update-pam_ssh-manpage.patch
 #double-free.patch
 EOF-password.patch
 fix-upstream-autotools.patch
+debianization.patch

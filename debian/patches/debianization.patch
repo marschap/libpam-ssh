@@ -1,0 +1,11 @@
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -25,7 +25,7 @@
+ # $Id: Makefile.am,v 1.19 2008/05/12 18:57:12 rosenauer Exp $
+ 
+ lib_LTLIBRARIES			= pam_ssh.la
+-pam_ssh_la_LDFLAGS		= -avoid-version -module
++pam_ssh_la_LDFLAGS		= -avoid-version -module -Wl,--version-script,debian/pam_ssh.version
+ pam_ssh_la_LIBADD		= @LTLIBOBJS@
+ pam_ssh_la_SOURCES = \
+ 	misc.c misc.h \
